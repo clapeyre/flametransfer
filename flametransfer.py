@@ -54,6 +54,12 @@ class ShellCmd(cmd.Cmd, object):
         os.system(s)
     do_sh = do_shell
 
+    def help_shell(self):
+        print dedent("""\
+                Execute a regular shell command
+                shell, sh, and ! are equivalent calls""")
+    help_sh = help_shell
+
 
 class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
     """Command line interpreter for flame transfer"""
@@ -65,41 +71,42 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         sys.exit()
 
     intro = dedent("""\
-            Welcome to the flametransfer command line
-            Type 'help' for a list of commands""")
+            Welcome to the FlameTransfer command line
+            Type 'help' or '?' for a list of commands, ?about for more on this app""")
 
     prompt = "ft > "
     flames = []
     current_flame = None
 
-    def exec_hip(self):
-        """Execute the current hip script."""
-        if not self.current_flame.do_hip:
-            print "*** flame is not ready to execute hip"
-            return
-        self.do_shell(self.hip_exec + ' < script.hip; echo')
-        self.current_flame.do_hip = False
+    def help_about(self):
+        print dedent("""
+                --------------------------------
+                Welcome to the FlameTransfer App
+                --------------------------------
+                
+                This app is meant for the import / export and manipulation of
+                hdf5 flame files, representing an active flame.  Parameters
+                needed for acoustic computations are stored, such as flame
+                geometry, reference point and vector, as well as N-tau values.
+                Additional data about the flame can also be stored to help
+                identify and locate it in the engine.
 
-    def help_introduction(self):
-        print 'introduction'
-        print 'a good place for a tutorial'
+                Available commands can be listed using 'help' or '?'.  Most
+                commands can be abbreviated to the first 2 characters (but not
+                'help'). Also, tab completion works, including after a command:
+
+                ft > ge<tab>
+                circle         cylinder       parallelogram  sphere 
+
+                Awesome, right?
+                """)
+    help_ab = help_about
 
     def emptyline(self):
         """Empty line behavior: do nothing"""
         pass
 
-    def do_add(self, s):
-        l = s.split()
-        if len(l)!=2:
-           print "*** invalid number of arguments"
-           return
-        try:
-           l = [int(i) for i in l]
-        except ValueError:
-           print "*** arguments should be numbers"
-           return
-        print l[0]+l[1]
-
+    generators = "circle cylinder parallelogram sphere".split()
     def do_generate(self, s):
         args = s.split()
         if len(args) != 2:
@@ -108,34 +115,65 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         if args[1].lower()[:2] == "ci":
             center = input_float(raw_input('Circle center (x y) : '))
             radius = input_float(raw_input('Circle radius (r)   : '))
-            self.current_flame = ActiveFlame(args[0])
+            self.current_flame = ActiveFlame(args[0], self.hip_exec)
             self.current_flame.define_flame_circle(center, radius)
         if args[1].lower()[:2] == "pa":
-            xref = input_float(raw_input('Corner point  (x y) : '))
-            vec1 = input_float(raw_input('Side vector 1 (x y) : '))
-            vec2 = input_float(raw_input('Side vector 2 (x y) : '))
-            self.current_flame = ActiveFlame(args[0])
-            self.current_flame.define_flame_parallelogram(xref, vec1, vec2)
+            dim = int(raw_input('Number of dimensions (2 or 3) : '))
+            if dim == 2:
+                xref = input_float(raw_input('Corner point  (x y) : '))
+                vec1 = input_float(raw_input('Side vector 1 (x y) : '))
+                vec2 = input_float(raw_input('Side vector 2 (x y) : '))
+                self.current_flame = ActiveFlame(args[0], self.hip_exec)
+                self.current_flame.define_flame_parallelogram(xref, vec1, vec2)
+            if dim == 3:
+                xref = input_float(raw_input('Corner point  (x y z) : '))
+                vec1 = input_float(raw_input('Side vector 1 (x y z) : '))
+                vec2 = input_float(raw_input('Side vector 2 (x y z) : '))
+                vec3 = input_float(raw_input('Side vector 3 (x y z) : '))
+                self.current_flame = ActiveFlame(args[0], self.hip_exec)
+                self.current_flame.define_flame_parallelepiped(xref, vec1, vec2, vec3)
+            else:
+                print "*** nope, it's either 2 or 3"
+                return
         if args[1].lower()[:2] == "sp":
             center = input_float(raw_input('Sphere center (x y z) : '))
             radius = input_float(raw_input('Sphere radius (r)     : '))
-            self.current_flame = ActiveFlame(args[0])
+            self.current_flame = ActiveFlame(args[0], self.hip_exec)
             self.current_flame.define_flame_sphere(center, radius)
         elif args[1].lower()[:2] == "cy":
             center = input_float(raw_input('Cylinder center (x y z) : '))
             radius = input_float(raw_input('Cylinder radius (r)     : '))
             vector = input_float(raw_input('Cylinder vector (x y z) : '))
-            self.current_flame = ActiveFlame(args[0])
+            self.current_flame = ActiveFlame(args[0], self.hip_exec)
             self.current_flame.define_flame_cylinder(center, radius, vector)
         else:
             print "*** unkown flame shape"
             return
         self.flames.append(self.current_flame)
-        self.exec_hip()
         self.current_flame.read_meshpoints()
-        self.do_shell("rm " + self.current_flame.mesh_file)
+        self.do_shell("rm mesh_{}.*".format(self.current_flame.metas.name))
     do_ge = do_generate
 
+    def help_generate(self):
+        print dedent("""\
+                Generate an analytical flame shape
+                > ge(nerate) <name> <shape>
+                |  <name>  : careful, same name flame are overwritten
+                |  <shape> : """ + ", ".join(self.generators))
+    help_ge = help_generate
+
+    def complete_generate(self, text, line, begidx, endidx):
+        if not text:
+            completions = self.generators[:]
+        else:
+            completions = [ f
+                            for f in self.generators
+                            if f.startswith(text)
+                            ]
+        return completions
+    complete_ge = complete_generate
+
+    writers = "mesh flame ntau".split()
     def do_write(self, s):
         if self.current_flame is None:
             print "*** no flames defined yet"
@@ -143,12 +181,11 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         if self.current_flame.metas.ref_point is None:
             print "*** please set reference point and vector before writing"
             return
-        if s[:2] == "me":
-            self.make_mesh_script()
-            self.exec_hip()
-        elif s[:2] == "fl":
+        if s[:2] == "me": # me(sh)
+            self.make_mesh()
+        elif s[:2] == "fl": # fl(ame)
             self.current_flame.write_h5()
-        elif s[:2] == "nt":
+        elif s[:2] == "nt": # nt(au)
             if self.current_flame.metas.n2_tau is None:
                 print "*** please set N-tau before writing"
                 return
@@ -167,38 +204,63 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 |  ntau  : write ascii n-tau file""")
     help_wr = help_write
 
-    def help_generate(self):
-        print dedent("""\
-                Generate an analytical flame shape
-                > ge(nerate) <name> <shape>
-                |  <name>  : careful, same name flame are overwritten
-                |  <shape> : sphere, cylinder""")
-    help_ge = help_generate
+    def complete_write(self, text, line, begidx, endidx):
+        if not text:
+            completions = self.writers[:]
+        else:
+            completions = [ f
+                            for f in self.writers
+                            if f.startswith(text)
+                            ]
+        return completions
+    complete_wr = complete_write
 
+    listers = "flames refs metas".split()
     def do_list(self, s):
         if self.current_flame is None:
             print "*** no flames defined yet"
             return
-        if s[:2] == "fl":
-            print "     Name       ndim"
+        out = open(s.split()[-1], 'w') if (len(s.split()) > 1) else sys.stdout
+        if s[:2] == "fl": # fl(ames)
+            out.write("     Name       ndim\n")
             for i, f in enumerate(self.flames) :
                 star = "*" if f == self.current_flame else " "
-                print "{0} {1:2} {2:10} {3}".format(star, i+1, f.metas.name, f.metas.ndim)
-        elif s[:2] == "re":
-            print "Reference point  :", self.current_flame.metas.ref_point
-            print "Reference vector :", self.current_flame.metas.ref_vect
+                out.write("{0} {1:2} {2:10} {3}\n".format(star, i+1, f.metas.name, f.metas.ndim))
+        elif s[:2] == "re": # re(fs)
+            out.write("Reference point  : {}\n".format(self.current_flame.metas.ref_point))
+            out.write("Reference vector : {}\n".format(self.current_flame.metas.ref_vect))
+        elif s[:2] == "me": # me(tas):
+            out.write(" Key                  | Value\n")
+            out.write(" -------------------------------------------\n")
+            for k, v in self.current_flame.metas.__dict__.iteritems():
+                out.write(" {0:20} | {1}".format(k, v).replace('\n', ' - ') + '\n')
         else:
             print "*** unknown argument"
+            return
     do_li = do_list
 
     def help_list(self):
         print dedent("""\
                 List current memory information
-                > li(st) fl(ames)|re(fs)
+                > li(st) fl(ames)|re(fs) [<path>]
                 |   <flames> : view all flames in memory
-                |   <refs>   : view reference point and vector""")
+                |   <refs>   : view reference point and vector of current
+                |   <metas>  : view all metas of current
+                |   [<path>] : dump output to file <path> instead of stdout""")
     help_li = help_list
 
+    def complete_list(self, text, line, begidx, endidx):
+        if not text:
+            completions = self.listers[:]
+        else:
+            completions = [ f
+                            for f in self.listers
+                            if f.startswith(text)
+                            ]
+        return completions
+    complete_li = complete_list
+
+    setters = "current meta refs ntau".split()
     def do_set(self, s):
         """Change flame meta parameter"""
         if len(s.split()) != 1:
@@ -207,23 +269,41 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         if self.current_flame is None:
             print "*** no flames defined yet"
             return
-        if s[:2] == "me":
+        if s[:2] == "cu": # cu(rrent)
+            cur = raw_input('Set current flame to : ')
+            try:
+                nb = int(cur)
+                if nb <= len(self.flames):
+                    self.current_flame = self.flames[nb-1]
+                    return
+                else:
+                    print "*** there are only {} flames declared".format(len(self.flames))
+                    return
+            except ValueError:
+                for fla in self.flames:
+                    if fla.metas.name == cur:
+                        self.current_flame = fla
+                        return
+                print "*** no such flame declared"
+                return
+        if s[:2] == "me": # me(ta)
             meta = raw_input('Name of meta field to modify : ')
             if not hasattr(self.current_flame.metas, meta):
                 print "*** unknown meta"
                 return
             typ = raw_input('Type of the field : ')
+            val = raw_input('Value             : ')
             if typ == 'int':
-                self.current_flame.update_metas({args[1]: int(args[1])})
+                self.current_flame.update_metas({meta: int(val)})
             elif typ == 'float':
-                self.current_flame.update_metas({args[1]: float(args[1])})
+                self.current_flame.update_metas({meta: float(val)})
             elif typ == 'array':
-                self.current_flame.update_metas({args[1]: np.array([
-                    float(v) for v in args[3:]])})
+                self.current_flame.update_metas({meta: np.array([
+                    float(v) for v in val.split()])})
             else:
-                print "*** unknown type " + args[2]
+                print "*** unknown type " + typ
                 return
-        elif s[:2] == "re":
+        elif s[:2] == "re": # "re(fs)"
             metas = {}
             metas["ref_point"] = input_float(raw_input('Reference point  (x y z) : '))
             metas["ref_vect"] = input_float(raw_input('Reference vector (x y z) : '))
@@ -235,12 +315,12 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 return
             path = raw_input("Path to N-tau file : ")
             freq, n, tau = np.loadtxt(path)
-            if typ in "n1 crocco".split():
+            if typ in "n1 crocco cr".split():
                 area, p_mean, gamma = input_float(raw_input("Area, Pmean, gamma : "))
                 self.current_flame.set_n1_tau(freq, tau, n, area, p_mean, gamma)
-            elif typ in "n2 global".split():
+            elif typ in "n2 global gl".split():
                 self.current_flame.set_n2_tau(freq, tau, n)
-            elif typ in "n3 adim".split():
+            elif typ in "n3 adim ad".split():
                 u_bar, q_bar = input_float(raw_input("U_bar, Q_bar : "))
                 self.current_flame.set_n3_tau(freq, tau, n, u_bar, q_bar)
         else:
@@ -250,12 +330,47 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
     def help_set(self):
         print dedent("""\
                 Set a value or parameter
-                > set meta <type> <values(s)>
+                > set me(ta) <type> <values(s)>
                 |  Set any meta parameter for the flame
                 |  <type> = int, float or array
-                > set refs
-                |  Set the reference point and vector""")
+                > set re(fs)
+                |  Set the reference point and vector
+                > set nt(au)
+                |  Set values of N and tau""")
     help_se = help_set
+
+    def complete_set(self, text, line, begidx, endidx):
+        if not text:
+            completions = self.setters[:]
+        else:
+            completions = [ f
+                            for f in self.setters
+                            if f.startswith(text)
+                            ]
+        return completions
+    complete_se = complete_set
+
+    def do_read(self, s):
+        args = s.split()
+        if len(args) > 2:
+            print "*** invalid number of arguments"
+            return
+        self.current_flame = ActiveFlame('dummy', self.hip_exec)
+        if args[-1] == "metas_only":
+            self.current_flame.load_metas(path)
+        else:
+            self.current_flame.load(path)
+            self.flames.append(self.current_flame)
+    do_re = do_read
+
+    def help_read(self):
+        print dedent("""\
+                Read hdf5 flame file
+                > re(ad) <path> [metas_only]
+                | <path>       : absolute or relative path to flame .h5 file
+                | [metas_only] : only read the flame's metas. Faster, but incomplete""")
+    help_re = help_read
+
 
 if __name__ == '__main__':
     interpreter = FlameTransferCmd()
