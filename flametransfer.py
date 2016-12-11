@@ -356,10 +356,10 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             print "*** invalid number of arguments"
             return
         self.current_flame = ActiveFlame('dummy', self.hip_exec)
-        if args[-1] == "metas_only":
-            self.current_flame.load_metas(path)
+        if args[-1] == "metas_only":
+            self.current_flame.load_metas(args[0])
         else:
-            self.current_flame.load(path)
+            self.current_flame.load(args[0])
             self.flames.append(self.current_flame)
     do_re = do_read
 
@@ -368,7 +368,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 Read hdf5 flame file
                 > re(ad) <path> [metas_only]
                 | <path>       : absolute or relative path to flame .h5 file
-                | [metas_only] : only read the flame's metas. Faster, but incomplete""")
+                | [metas_only] : only read the flame's metas. Faster, but incomplete""")
     help_re = help_read
 
 
