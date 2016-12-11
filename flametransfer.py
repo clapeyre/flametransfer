@@ -182,7 +182,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             print "*** please set reference point and vector before writing"
             return
         if s[:2] == "me": # me(sh)
-            self.make_mesh()
+            self.current_flame.make_mesh()
         elif s[:2] == "fl": # fl(ame)
             self.current_flame.write_h5()
         elif s[:2] == "nt": # nt(au)
