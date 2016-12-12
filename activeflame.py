@@ -8,8 +8,10 @@ Created November 2016 by COOP team
 
 import os
 import sys
+import time
 import logging
 import subprocess
+import commands
 import numpy as np
 
 from os.path import join, isdir
@@ -17,8 +19,9 @@ from math import pi
 from h5py import File
 from textwrap import dedent
 from StringIO import StringIO
+from tempfile import TemporaryFile
 
-from geometry import Parallelepiped, Sphere, Cylinder, Parallelogram, Circle
+from geometry import Parallelepiped, Sphere, Cylinder, Parallelogram, Circle, ScatterShape2D, ScatterShape3D
 
 GRID_SIZE = 32
 VERSION = "0.1"
@@ -32,27 +35,50 @@ class ActiveFlame(object):
         self.flame_file = None
         self.shape = None
         self.metas = FlameMetas(name=name)
-        self.do_hip = False
         self.hip_exec = hip_exec
         self.__dict__.update(kwargs)
 
-    def exec_hip(self):
-        """Execute the current hip script."""
-        if not self.do_hip:
-            print "*** flame is not ready to execute hip"
-            return
-        sys.stdout.flush()
-        os.system(self.hip_exec + ' < script.hip; echo')
-        self.do_hip = False
+    def __getstate__(self):
+        d = dict(self.__dict__)
+        del d['log']
+        return d
 
-    @staticmethod
-    def compute_n_crocco(n1, area, p_mean, gamma):
+    def __setstate__(self, d):
+        self.__dict__.update(d)
+        self.log = logging.getLogger(__name__)
+
+    def exec_hip(self, script):
+        """Execute the current hip script."""
+        path = 'script.hip'
+        with open(path, 'w') as f:
+            f.write(script)
+        with TemporaryFile() as output:
+            process = subprocess.Popen(
+                    [self.hip_exec, path],
+                    stdin=subprocess.PIPE,
+                    stdout=output,
+                    stderr=subprocess.STDOUT
+                    )
+            while process.poll() is None:
+                where = output.tell()
+                lines = output.read()
+                if not lines:
+                    time.sleep(0.1)
+                    output.seek(where)
+                else:
+                    sys.stdout.write(lines)
+                    sys.stdout.flush()
+            sys.stdout.write(output.read())
+            sys.stdout.flush()
+        print
+
+    def compute_n_crocco(self, n1, area, p_mean, gamma):
         """Define gain (N2) using Crocco's analytical formulation"""
         return gamma * p_mean * area / (gamma - 1.) * n1
 
     def set_n1_tau(self, freq, tau, n1, area, p_mean, gamma):
         """Set N and tau from Crocco model (N1)"""
-        self.set_n2_tau(freq, tau, compute_n_crocco(n1, area, p_mean, gamma))
+        self.set_n2_tau(freq, tau, self.compute_n_crocco(n1, area, p_mean, gamma))
 
     def set_n2_tau(self, freq, tau, n2):
         """Set N and tau from global values (same as AVSP internal)"""
@@ -72,77 +98,112 @@ class ActiveFlame(object):
         else:
             self.log.error("q_bar info not available, cannot compute n3")
 
-    def define_hrthreshold_flame(self, avbp_mesh, avbp_sol, threshold):
-        """Define flame from avbp Heat Release threshold"""
-        raise NotImplementedError
-        # TODO
-        # Identify bounding box in source (hard!)
-        # self.make_mesh()
-        self.metas.generation_method = "scalar_and_threshold"
-        # interpolate threshold on mesh
-        # self.metas.volume = ??
+    def define_threshold_flame(self, avbp_mesh, avbp_sol, field, thresh):
+        """Define flame from avbp scalar and threshold"""
+        self.metas.generation_method = "avbp_scalar_threshold"
+        mesh = File(avbp_mesh, 'r')
+        sol = File(avbp_sol, 'r')
+        def find_field(name):
+            if field in name: return name
+        data = sol[sol.visit(find_field)].value
+        above = data > np.float(thresh)
+        x = mesh["Coordinates/x"].value
+        y = mesh["Coordinates/y"].value
+        x_in = x[above]
+        y_in = y[above]
+        if 'z' in mesh["Coordinates"].keys():
+            z = mesh["Coordinates/z"].value
+            z_in = z[above]
+            print x_in.min(), x_in.max(), y_in.min(), y_in.max(), z_in.min(), z_in.max()
+            self.shape = ScatterShape3D(
+                    x_in.min(), x_in.max(),
+                    y_in.min(), y_in.max(),
+                    z_in.min(), z_in.max())
+        else:
+            self.shape = ScatterShape2D(
+                    x_in.min(), x_in.max(),
+                    y_in.min(), y_in.max())
+        self.make_mesh()
+        with File("dummy_avbp.h5", 'w') as f:
+            f.create_group
+            f.create_group("/Additionals")
+            f['/Additionals/n_tau_flag'] = 1.0*above
+            f.create_group("/Parameters")
+            f['/Parameters/ndim'] = np.array([self.metas.ndim])
+            f['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            f['/Parameters/versionstring'] = "C3Sm_Flame"
+        script = [
+                "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
+                "re hd {0}".format(self.mesh_file),
+                "in gr 1",
+                "wr hd -s dummy_flame",
+                "qu",
+                ]
+        self.exec_hip('\n'.join(script))
+        self.shape.inside_points = File(
+                "dummy_flame.sol.h5", 'r')['Additionals/n_tau_flag'].value
 
     def define_flame_circle(self, center, radius):
         """Define flame as parallelogram"""
-        self.metas.ndim = 2
         self.metas.generation_method = "analytical2D_circle"
         self.shape = Circle(center, radius)
         self.metas.shape_params = np.hstack((center, radius))
-        self.update_metas(**self.shape.bounding_box())
         self.make_mesh()
-        self.read_meshpoints()
 
     def define_flame_parallelogram(self, xref, vec1, vec2):
         """Define flame as parallelogram"""
-        self.metas.ndim = 2
         self.metas.generation_method = "analytical2D_parallelogram"
         self.shape = Parallelogram(xref, vec1, vec2)
         self.metas.shape_params = np.hstack((xref, vec1, vec2))
-        self.update_metas(**self.shape.bounding_box())
         self.make_mesh()
-        self.read_meshpoints()
 
     def define_flame_sphere(self, center, radius):
         """Define spherical flame"""
-        self.metas.ndim = 3
         self.metas.generation_method = "analytical3D_sphere"
         self.shape = Sphere(center, radius)
         self.metas.shape_params = np.hstack((center, radius))
-        self.update_metas(**self.shape.bounding_box())
         self.make_mesh()
-        self.read_meshpoints()
 
     def define_flame_cylinder(self, center, radius, vector):
         """Define cylindrical flame"""
         self.log.debug("Defining cylinder flame")
-        self.metas.ndim = 3
         self.metas.generation_method = "analytical3D_cylinder"
         self.shape = Cylinder(center, radius, vector)
         self.metas.shape_params = np.hstack((center, radius, vector))
-        self.update_metas(**self.shape.bounding_box())
         self.make_mesh()
-        self.read_meshpoints()
 
     def define_flame_parallelepiped(self, xref, vec1, vec2, vec3):
         """Define flame as parallelepiped"""
-        self.metas.ndim = 3
         self.metas.generation_method = "analytical3D_parallelepiped"
         self.shape = Parallelogram(xref, vec1, vec2, vec3)
         self.metas.shape_params = np.hstack((xref, vec1, vec2, vec3))
-        self.update_metas(**self.shape.bounding_box())
         self.make_mesh()
-        self.read_meshpoints()
 
     def make_mesh(self):
-        self.make_mesh_script()
-        self.exec_hip()
-
-    def make_mesh_script(self):
         """Use bounding box to create box mesh containing flame geometry"""
-        with open('script.hip', 'w') as f:
-            f.write(self._get_hip_script_generate())
-        self.do_hip = True
+        self.update_metas(**self.shape.bounding_box())
+        self.metas.ndim = self.shape.ndim
         self.mesh_file = 'mesh_{0}.mesh.h5'.format(self.metas.name)
+        self.exec_hip(self._get_hip_script_generate())
+        self.read_meshpoints()
+
+    def _get_hip_script_generate(self):
+        """Generate hip script for mesh generation"""
+        assert self.metas.xmin is not None
+        if self.metas.ndim == 2:
+            hip_script = dedent("""\
+              ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
+              wr hd ./mesh_{0.name}
+              qu
+              """).format(self.metas)
+        elif self.metas.ndim == 3:
+            hip_script = dedent("""\
+              ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
+              co 3d {0.zmin} {0.zmax} {1} z
+              wr hd ./mesh_{0.name}
+              qu
+              """).format(self.metas, self.metas.grid_size - 1)
+        return hip_script
 
     def read_meshpoints(self):
         """Read hdf5 meshfile from hip and store coordinates"""
@@ -155,22 +216,6 @@ class ActiveFlame(object):
                                             f['/Coordinates/y'].value,
                                             f['/Coordinates/z'].value)).T
             self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:,0].size))
-
-    def _get_hip_script_generate(self):
-        """Generate hip script for mesh generation"""
-        assert self.metas.xmin is not None
-        if self.metas.ndim == 2:
-            hip_script = dedent("""\
-              ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
-              wr hd ./mesh_{0.name}
-              qu""").format(self.metas)
-        elif self.metas.ndim == 3:
-            hip_script = dedent("""\
-              ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
-              co 3d {0.zmin} {0.zmax} {1} z
-              wr hd ./mesh_{0.name}
-              qu""").format(self.metas, self.metas.grid_size - 1)
-        return hip_script
 
     def _get_hip_script_interpolate(self, src_mesh, src_sol, dest_mesh):
         """Generate hip script for flame interpolation on new mesh"""
@@ -191,7 +236,10 @@ class ActiveFlame(object):
         with File(path, 'w') as f:
             f.create_group("/Additionals")
             if with_metas: self.metas.write(f["/Additionals"].attrs)
-            f['/Additionals/n_tau_flag'] = 1.0*self.shape.is_inside(self.meshpoints)
+            if 'analytical' in self.metas.generation_method:
+                f['/Additionals/n_tau_flag'] = 1.0*self.shape.is_inside(self.meshpoints)
+            else:
+                f['/Additionals/n_tau_flag'] = self.shape.inside_points
             f.create_group("/Parameters")
             f['/Parameters/ndim'] = np.array([self.metas.ndim])
             f['/Parameters/nnode'] = np.array([self.meshpoints.size])
@@ -211,6 +259,7 @@ class ActiveFlame(object):
     def load(self, path):
         """Load a flame at path"""
         self.load_metas(path)
+        self.recreate_shape(path)
         self.make_mesh()
         self.read_meshpoints()
 
@@ -226,7 +275,7 @@ class ActiveFlame(object):
         """Update meta data"""
         self.metas.__dict__.update(**kwargs)
 
-    def recreate_shape(self):
+    def recreate_shape(self, path):
         """Create self.shape again based on metas"""
         if self.metas.generation_method == "analytical2D_circle":
             center = self.metas.shape_params[:2]
@@ -252,10 +301,19 @@ class ActiveFlame(object):
             vec2 = self.metas.shape_params[6:9]
             vec3 = self.metas.shape_params[9:]
             self.shape = Parallelepiped(xref, vec1, vec2, vec3)
-        elif self.metas.generation_method == "threshold":
-            self.log.error("Cannot recreate shape for threshold")
-            raise ValueError
-
+        elif self.metas.generation_method == "avbp_scalar_threshold":
+            if self.metas.ndim == 2:
+                self.shape = ScatterShape2D(
+                        self.metas.xmin, self.metas.xmax,
+                        self.metas.ymin, self.metas.ymax,
+                        )
+            else:
+                self.shape = ScatterShape3D(
+                        self.metas.xmin, self.metas.xmax,
+                        self.metas.ymin, self.metas.ymax,
+                        self.metas.zmin, self.metas.zmax,
+                        )
+            self.shape.inside_points = File(path, 'r')['Additionals/n_tau_flag'].value
 
 
 class FlameMetas(object):

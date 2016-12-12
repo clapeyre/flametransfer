@@ -36,6 +36,7 @@ class Shape2D(Shape):
     @abstractmethod
     def area(self):
         pass
+    volume = area
 
 
 class Shape3D(Shape):
@@ -49,6 +50,56 @@ class Shape3D(Shape):
         pass
 
 
+class ScatterShape2D(Shape2D):
+    def __init__(self, xmin, xmax, ymin, ymax):
+        self.xmin = xmin
+        self.ymin = ymin
+        self.xmax = xmax
+        self.ymax = ymax
+        self.inside_points = None
+        Shape2D.__init__(self)
+
+    def area(self):
+        """Get shape area"""
+        # TODO: The real area should be computed...
+        return (self.xmax-self.xmin) * (self.ymax-self.ymin)
+
+    def bounding_box(self):
+        """Get bounding box for shape"""
+        return {"xmin": self.xmin,
+                "ymin": self.ymin,
+                "xmax": self.xmax,
+                "ymax": self.ymax,
+                }
+
+
+class ScatterShape3D(Shape3D):
+    def __init__(self, xmin, xmax, ymin, ymax, zmin, zmax):
+        self.xmin = xmin
+        self.ymin = ymin
+        self.xmax = xmax
+        self.ymax = ymax
+        self.zmin = zmin
+        self.zmax = zmax
+        self.inside_points = None
+        Shape3D.__init__(self)
+
+    def volume(self):
+        """Get shape volume"""
+        # TODO: The real volume should be computed...
+        return (self.xmax-self.xmin) * (self.ymax-self.ymin) * (self.zmax-self.zmin)
+
+    def bounding_box(self):
+        """Get bounding box for shape"""
+        return {"xmin": self.xmin,
+                "ymin": self.ymin,
+                "zmin": self.zmin,
+                "xmax": self.xmax,
+                "ymax": self.ymax,
+                "zmax": self.zmax,
+                }
+
+
 class Parallelogram(Shape2D):
     def __init__(self, xref, vec1, vec2):
         self.xref = xref
@@ -58,7 +109,6 @@ class Parallelogram(Shape2D):
     def area(self):
         """Get parallelogram area"""
         return abs(np.linalg.det(self.mat))
-    volume = area
 
     def project(self, x):
         """Project vector x on basis formed by parallelogram
@@ -132,7 +182,6 @@ class Circle(Shape2D):
     def area(self):
         """Get circle area"""
         return np.pi * self.radius**2
-    volume = area
 
     def distance(self, x):
         """Find distance to circle center"""

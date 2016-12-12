@@ -9,6 +9,7 @@ import os
 import logging
 import sys
 import cmd
+import copy
 import numpy as np
 
 from textwrap import dedent
@@ -102,10 +103,17 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
 
                 Available commands can be listed using 'help' or '?'.  Most
                 commands can be abbreviated to the first 2 characters (but not
-                'help'). Also, tab completion works, including after a command:
+                'help'). Everything is parsed based on whitespaces, so a vector
+                is simply:
+                
+                Please input vector : 1 0 0
+                
+                This implies that 'my new flame' will not work as a flame name.
+                Also, tab completion works, including after a command:
 
-                ft > ge<tab>
-                circle         cylinder       parallelogram  sphere 
+                ft > gen<tab>
+                ft > generate <tab>
+                avbp_field     circle         cylinder       parallelogram  sphere 
 
                 Awesome, right?
                 """)
@@ -115,7 +123,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         """Empty line behavior: do nothing"""
         pass
 
-    generators = "circle cylinder parallelogram sphere".split()
+    generators = "avbp_field circle cylinder parallelogram sphere".split()
     def do_generate(self, s):
         args = s.split()
         if len(args) != 2:
@@ -155,6 +163,14 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             vector = input_float(raw_input('Cylinder vector (x y z) : '))
             self.current_flame = ActiveFlame(args[0], self.hip_exec)
             self.current_flame.define_flame_cylinder(center, radius, vector)
+        elif args[1].lower()[:2] == "av":
+            avbp_mesh = raw_input('AVBP mesh : ')
+            avbp_sol = raw_input('AVBP sol : ')
+            avbp_field = raw_input('Scalar field : ')
+            avbp_thresh = raw_input('Threshold value : ')
+            self.current_flame = ActiveFlame(args[0], self.hip_exec)
+            self.current_flame.define_threshold_flame(
+                    avbp_mesh, avbp_sol, avbp_field, avbp_thresh)
         else:
             print "*** unkown flame shape"
             return
@@ -167,8 +183,8 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         print dedent("""\
                 Generate an analytical flame shape
                 > ge(nerate) <name> <shape>
-                |  <name>  : careful, same name flame are overwritten
-                |  <shape> : """ + ", ".join(self.generators))
+                |  <name>  : careful, same name flame is overwritten
+                |  <shape> : one of """ + ", ".join(self.generators))
     help_ge = help_generate
 
     def complete_generate(self, text, line, begidx, endidx):
@@ -403,6 +419,45 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 | <path>       : absolute or relative path to flame .h5 file
                 | [metas_only] : only read the flame's metas. Faster, but incomplete""")
     help_re = help_read
+
+    def do_copy(self, s):
+        args = s.split()
+        if len(args) != 2:
+            print "*** invalid number of arguments"
+            return
+        if self.current_flame is None:
+            print "*** no flames defined yet"
+            return
+        src, dest = args
+        if dest in [f.metas.name for f in self.flames]:
+            print "*** {} is already a declared flame".format(dest)
+            return
+        try:
+            nb = int(src)
+            if nb <= len(self.flames):
+                self.flames.append(copy.deepcopy(self.flames[nb-1]))
+                self.current_flame = self.flames[-1]
+                return
+            else:
+                print "*** there are only {} flames declared".format(len(self.flames))
+                return
+        except ValueError:
+            for fla in self.flames:
+                if fla.metas.name == src:
+                    self.flames.append(copy.deepcopy(fla))
+                    self.current_flame = self.flames[-1]
+                    return
+            print "*** no such flame declared"
+            return
+    do_co = do_copy
+
+    def help_copy(self):
+        print dedent("""\
+                Copy existing flame
+                > co(py) <name_src> <name_dest>
+                | <name_src>  : name or number of flame to copy
+                | <name_dest> : name of destination flame""")
+    help_co = help_copy
 
 
 if __name__ == '__main__':
