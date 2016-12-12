@@ -259,7 +259,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 print "*** unknown key " + key
                 return
             out.write("{}".format(
-                self.current_flame.metas.__dict__[key].translate(None, '[],\n')))
+                self.current_flame.metas.__dict__[key]).translate(None, '[],\n'))
         else:
             print "*** unknown argument"
             return
