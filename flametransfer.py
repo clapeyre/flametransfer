@@ -347,7 +347,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             def exp_wrapper(path):
                 with open(path, 'r') as f:
                     return StringIO(f.read().lower().replace('d', 'e'))
-            freq, n, tau = np.loadtxt(exp_wrapper(path))
+            freq, n, tau = np.loadtxt(exp_wrapper(path)).T
             if typ in "n1 crocco cr".split():
                 area, p_mean, gamma = input_float(raw_input("Area, Pmean, gamma : "))
                 self.current_flame.set_n1_tau(freq, tau, n, area, p_mean, gamma)
