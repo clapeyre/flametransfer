@@ -253,7 +253,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         elif s[:2] == "du": # si(ngle_value)
             key = raw_input("Meta key : ")
             open(key, 'w').write(
-                    "{}".format(self.current_flame.metas[key].translate(None, '[],\n')))
+                    "{}".format(self.current_flame.metas.__dict__[key].translate(None, '[],\n')))
         else:
             print "*** unknown argument"
             return
