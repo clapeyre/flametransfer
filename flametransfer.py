@@ -251,9 +251,15 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             for k, v in self.current_flame.metas.__dict__.iteritems():
                 out.write(" {0:20} | {1}".format(k, v).replace('\n', ' - ') + '\n')
         elif s[:2] == "du": # si(ngle_value)
-            key = raw_input("Meta key : ")
-            open(key, 'w').write(
-                    "{}".format(self.current_flame.metas.__dict__[key].translate(None, '[],\n')))
+            if out == sys.stdout:
+                print "*** <key> argument mandatory for dump"
+                return
+            key = s.split()[-1]
+            if key not in self.current_flame.metas.__dict__.keys():
+                print "*** unknown key " + key
+                return
+            out.write("{}".format(
+                self.current_flame.metas.__dict__[key].translate(None, '[],\n')))
         else:
             print "*** unknown argument"
             return
@@ -262,12 +268,13 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
     def help_list(self):
         print dedent("""\
                 List current memory information
-                > li(st) fl(ames)|re(fs)|si(ngle_value)|me(tas) [<path>]
+                > li(st) fl(ames)|re(fs)|me(tas) [<path>]
                 |   flames   : view all flames in memory
                 |   refs     : view reference point and vector of current
                 |   metas    : view all metas of current
-                |   dump     : input a key, get the resulting meta value in a '<key>' file
-                |   [<path>] : dump output to file <path> instead of stdout""")
+                |   [<path>] : dump output to file <path> instead of stdout
+                > li(st) du(mp) <key>
+                |   <key>    : input a key, get the resulting meta value in a '<key>' file""")
     help_li = help_list
 
     def complete_list(self, text, line, begidx, endidx):
