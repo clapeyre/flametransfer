@@ -56,6 +56,14 @@ class ShellCmd(cmd.Cmd, object):
 
     def help_shell(self):
         print dedent("""\
+                Execute a regular shell command. 
+                Useful for e.g. 'sh ls' (to see what has been written).
+                Note : '!ls' is equivalent to 'sh ls'.
+                Warning : Your .bashrc file is *not* sourced.""")
+    help_sh = help_shell
+
+    def help_shell(self):
+        print dedent("""\
                 Execute a regular shell command
                 shell, sh, and ! are equivalent calls""")
     help_sh = help_shell
@@ -245,7 +253,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         elif s[:2] == "du": # si(ngle_value)
             key = raw_input("Meta key : ")
             open(key, 'w').write(
-                    "{}".format(self.current_flame.metas[key].translate(None, '[],\n'))
+                    "{}".format(self.current_flame.metas[key].translate(None, '[],\n')))
         else:
             print "*** unknown argument"
             return
