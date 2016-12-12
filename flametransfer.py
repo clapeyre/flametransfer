@@ -12,6 +12,7 @@ import cmd
 import numpy as np
 
 from textwrap import dedent
+from StringIO import StringIO
 
 from activeflame import ActiveFlame
 
@@ -238,10 +239,11 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             return
         out = open(s.split()[-1], 'w') if (len(s.split()) > 1) else sys.stdout
         if s[:2] == "fl": # fl(ames)
-            out.write("     Name       ndim\n")
+            out.write("     Name       ndim Volume\n")
             for i, f in enumerate(self.flames) :
                 star = "*" if f == self.current_flame else " "
-                out.write("{0} {1:2} {2:10} {3}\n".format(star, i+1, f.metas.name, f.metas.ndim))
+                out.write("{0} {1:2} {2:10} {3}  {4}\n".format(
+                    star, i+1, f.metas.name, f.metas.ndim, f.shape.volume()[0]))
         elif s[:2] == "re": # re(fs)
             out.write("Reference point  : {}\n".format(self.current_flame.metas.ref_point))
             out.write("Reference vector : {}\n".format(self.current_flame.metas.ref_vect))
@@ -249,7 +251,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             out.write(" Key                  | Value\n")
             out.write(" -------------------------------------------\n")
             for k, v in self.current_flame.metas.__dict__.iteritems():
-                out.write(" {0:20} | {1}".format(k, v).replace('\n', ' - ') + '\n')
+                out.write(" {0:20} | {1}".format(k, v).replace('\n', ' ') + '\n')
         elif s[:2] == "du": # si(ngle_value)
             if out == sys.stdout:
                 print "*** <key> argument mandatory for dump"
@@ -259,7 +261,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 print "*** unknown key " + key
                 return
             out.write("{}".format(
-                self.current_flame.metas.__dict__[key]).translate(None, '[],\n'))
+                self.current_flame.metas.__dict__[key]).translate(None, '[],'))
         else:
             print "*** unknown argument"
             return
@@ -342,7 +344,10 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 print "*** unknown N type"
                 return
             path = raw_input("Path to N-tau file : ")
-            freq, n, tau = np.loadtxt(path)
+            def exp_wrapper(path):
+                with open(path, 'r') as f:
+                    return StringIO(f.read().lower().replace('d', 'e'))
+            freq, n, tau = np.loadtxt(exp_wrapper(path))
             if typ in "n1 crocco cr".split():
                 area, p_mean, gamma = input_float(raw_input("Area, Pmean, gamma : "))
                 self.current_flame.set_n1_tau(freq, tau, n, area, p_mean, gamma)

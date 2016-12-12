@@ -58,6 +58,7 @@ class Parallelogram(Shape2D):
     def area(self):
         """Get parallelogram area"""
         return abs(np.linalg.det(self.mat))
+    volume = area
 
     def project(self, x):
         """Project vector x on basis formed by parallelogram
@@ -131,6 +132,7 @@ class Circle(Shape2D):
     def area(self):
         """Get circle area"""
         return np.pi * self.radius**2
+    volume = area
 
     def distance(self, x):
         """Find distance to circle center"""

@@ -16,6 +16,7 @@ from os.path import join, isdir
 from math import pi
 from h5py import File
 from textwrap import dedent
+from StringIO import StringIO
 
 from geometry import Parallelepiped, Sphere, Cylinder, Parallelogram, Circle
 
@@ -201,9 +202,11 @@ class ActiveFlame(object):
         """Write ascii n_tau file for flame"""
         assert self.metas.n2_tau is not None
         path = 'n_tau_{}.dat'.format(self.metas.name)
+        buf = StringIO()
+        np.savetxt(buf, self.metas.n2_tau.T)
         with open(path, 'w') as f:
-            f.write("# Frequency N2 tau  - Generated using C3Sm\n")
-            np.savetxt(f, self.metas.n2_tau.T)
+            f.write("# Frequency N2 tau  - Generated using flametransfer\n")
+            f.write(''.join([c if c.lower() != 'e' else 'd' for c in buf.getvalue()]))
 
     def load(self, path):
         """Load a flame at path"""
