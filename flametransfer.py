@@ -173,7 +173,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         return completions
     complete_ge = complete_generate
 
-    writers = "mesh flame ntau".split()
+    writers = "mesh flame ntau all".split()
     def do_write(self, s):
         if self.current_flame is None:
             print "*** no flames defined yet"
@@ -190,6 +190,13 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 print "*** please set N-tau before writing"
                 return
             self.current_flame.write_n_tau()
+        elif s[:2] == "al": # al(l)
+            self.current_flame.make_mesh()
+            self.current_flame.write_h5()
+            if self.current_flame.metas.n2_tau is None:
+                print "*** please set N-tau before writing"
+                return
+            self.current_flame.write_n_tau()
         else:
             print "*** unknown option"
             return
@@ -201,7 +208,8 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 > wr(ite) me(sh)|fl(ame)|nt(au)
                 |  mesh  : write hdf5 mesh file
                 |  flame : write hdf5 flame file
-                |  ntau  : write ascii n-tau file""")
+                |  ntau  : write ascii n-tau file
+                |  all   : write all of the above""")
     help_wr = help_write
 
     def complete_write(self, text, line, begidx, endidx):
@@ -215,7 +223,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         return completions
     complete_wr = complete_write
 
-    listers = "flames refs metas".split()
+    listers = "flames refs metas dump".split()
     def do_list(self, s):
         if self.current_flame is None:
             print "*** no flames defined yet"
@@ -234,6 +242,10 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             out.write(" -------------------------------------------\n")
             for k, v in self.current_flame.metas.__dict__.iteritems():
                 out.write(" {0:20} | {1}".format(k, v).replace('\n', ' - ') + '\n')
+        elif s[:2] == "du": # si(ngle_value)
+            key = raw_input("Meta key : ")
+            open(key, 'w').write(
+                    "{}".format(self.current_flame.metas[key].translate(None, '[],\n'))
         else:
             print "*** unknown argument"
             return
@@ -242,10 +254,11 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
     def help_list(self):
         print dedent("""\
                 List current memory information
-                > li(st) fl(ames)|re(fs) [<path>]
-                |   <flames> : view all flames in memory
-                |   <refs>   : view reference point and vector of current
-                |   <metas>  : view all metas of current
+                > li(st) fl(ames)|re(fs)|si(ngle_value)|me(tas) [<path>]
+                |   flames   : view all flames in memory
+                |   refs     : view reference point and vector of current
+                |   metas    : view all metas of current
+                |   dump     : input a key, get the resulting meta value in a '<key>' file
                 |   [<path>] : dump output to file <path> instead of stdout""")
     help_li = help_list
 
