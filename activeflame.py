@@ -269,6 +269,9 @@ class ActiveFlame(object):
                     "qu\n"
                     ]
             self.exec_hip("\n".join(script))
+            if with_metas:
+                with File(self.flame_file, 'a') as f:
+                    self.metas.write(f["/Additionals"].attrs)
             os.remove("flame_{0}.asciiBound".format(self.metas.name))
             self.log.info(
                     "Wrote flame and mesh files: flame_{0}.mesh.h5, "
