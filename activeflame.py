@@ -132,16 +132,31 @@ class ActiveFlame(object):
             f['/Parameters/ndim'] = np.array([self.metas.ndim])
             f['/Parameters/nnode'] = np.array([self.meshpoints.size])
             f['/Parameters/versionstring'] = "C3Sm_Flame"
+        with File("dummy_flametrans.h5", 'w') as f:
+            f.create_group
+            f.create_group("/Additionals")
+            f['/Additionals/n_tau_flag'] = 0.0*above
+            f.create_group("/Parameters")
+            f['/Parameters/ndim'] = np.array([self.metas.ndim])
+            f['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            f['/Parameters/versionstring'] = "C3Sm_Flame"
         script = [
                 "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
-                "re hd {0}".format(self.mesh_file),
+                "re hd -a {0} -s dummy_flametrans.h5".format(self.mesh_file),
+                "set in-rim 0.9"
                 "in gr 1",
-                "wr hd -s dummy_flame",
+                "wr hd dummy_flame",
                 "qu",
                 ]
         self.exec_hip('\n'.join(script))
         self.shape.inside_points = File(
                 "dummy_flame.sol.h5", 'r')['Additionals/n_tau_flag'].value
+        if not self.debug:
+            os.remove("dummy_avbp.h5")
+            os.remove("dummy_flametrans.h5")
+            os.remove("dummy_flame.sol.h5")
+            os.remove("dummy_flame.mesh.h5")
+            os.remove("dummy_flame.asciiBound")
 
     def define_flame_circle(self, center, radius):
         """Define flame as parallelogram"""
