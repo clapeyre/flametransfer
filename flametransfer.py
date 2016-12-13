@@ -408,7 +408,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         if len(args) > 2:
             print "*** invalid number of arguments"
             return
-        self.current_flame = ActiveFlame('dummy', self.hip_exec)
+        self.current_flame = ActiveFlame('tmp', self.hip_exec)
         if args[-1] == "metas_only":
             self.current_flame.load_metas(args[0])
         else:

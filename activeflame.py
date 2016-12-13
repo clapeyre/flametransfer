@@ -36,11 +36,15 @@ class ActiveFlame(object):
         self.metas = FlameMetas(name=name)
         self.hip_exec = hip_exec
         self.__dict__.update(kwargs)
-        self._inits()
 
-    def _inits(self):
-        self.mesh_file = 'flame_{0}.mesh.h5'.format(self.metas.name)
-        self.flame_file = "flame_{0}.sol.h5".format(self.metas.name)
+    @property
+    def mesh_file(self):
+        return 'flame_{0}.mesh.h5'.format(self.metas.name)
+
+    @property
+    def flame_file(self):
+        return 'flame_{0}.sol.h5'.format(self.metas.name)
+
 
     def __getstate__(self):
         d = dict(self.__dict__)
@@ -290,14 +294,17 @@ class ActiveFlame(object):
     def load(self, path):
         """Load a flame at path"""
         self.load_metas(path)
+        self.log.info("Loaded flame named " + self.metas.name)
+        self.log.debug(repr(self.metas.__dict__))
         self.recreate_shape(path)
         self.make_mesh()
         self.read_meshpoints()
 
     def load_metas(self, path):
         """Load only the metas of flame at path"""
-        flame = File(path, 'r')
-        self.metas.load(flame['Additionals'].attrs)
+        self.log.debug("Loading metas for file " + path)
+        with File(path, 'r') as flame:
+            self.metas.load(flame['Additionals'].attrs)
         if float(self.metas.version) > float(VERSION):
             self.log.error("Cannot read future version flame. Please update your FlameTransfer app")
             raise ValueError
@@ -308,6 +315,7 @@ class ActiveFlame(object):
 
     def recreate_shape(self, path):
         """Create self.shape again based on metas"""
+        self.log.info("Recreating shape " + self.metas.generation_method)
         if self.metas.generation_method == "analytical2D_circle":
             center = self.metas.shape_params[:2]
             radius = self.metas.shape_params[2]
@@ -345,6 +353,9 @@ class ActiveFlame(object):
                         self.metas.zmin, self.metas.zmax,
                         )
             self.shape.inside_points = File(path, 'r')['Additionals/n_tau_flag'].value
+        else:
+            self.log.error("Unknown flame generation method")
+            raise ValueError
 
 
 class FlameMetas(object):
