@@ -131,10 +131,10 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             return
         if args[1].lower()[:2] == "ci":
             center = input_float(raw_input('Circle center (x y) : '))
-            radius = input_float(raw_input('Circle radius (r)   : '))
+            radius = input_float(raw_input('Circle radius (r)   : '))[0]
             self.current_flame = ActiveFlame(args[0], self.hip_exec)
             self.current_flame.define_flame_circle(center, radius)
-        if args[1].lower()[:2] == "pa":
+        elif args[1].lower()[:2] == "pa":
             dim = int(raw_input('Number of dimensions (2 or 3) : '))
             if dim == 2:
                 xref = input_float(raw_input('Corner point  (x y) : '))
@@ -142,7 +142,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 vec2 = input_float(raw_input('Side vector 2 (x y) : '))
                 self.current_flame = ActiveFlame(args[0], self.hip_exec)
                 self.current_flame.define_flame_parallelogram(xref, vec1, vec2)
-            if dim == 3:
+            elif dim == 3:
                 xref = input_float(raw_input('Corner point  (x y z) : '))
                 vec1 = input_float(raw_input('Side vector 1 (x y z) : '))
                 vec2 = input_float(raw_input('Side vector 2 (x y z) : '))
@@ -152,7 +152,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             else:
                 print "*** nope, it's either 2 or 3"
                 return
-        if args[1].lower()[:2] == "sp":
+        elif args[1].lower()[:2] == "sp":
             center = input_float(raw_input('Sphere center (x y z) : '))
             radius = input_float(raw_input('Sphere radius (r)     : '))
             self.current_flame = ActiveFlame(args[0], self.hip_exec)
@@ -176,7 +176,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             return
         self.flames.append(self.current_flame)
         self.current_flame.read_meshpoints()
-        self.do_shell("rm mesh_{}.*".format(self.current_flame.metas.name))
+        #self.do_shell("rm mesh_{}.*".format(self.current_flame.metas.name))
     do_ge = do_generate
 
     def help_generate(self):
@@ -198,7 +198,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         return completions
     complete_ge = complete_generate
 
-    writers = "mesh flame ntau all".split()
+    writers = "mesh flame full ntau all".split()
     def do_write(self, s):
         if self.current_flame is None:
             print "*** no flames defined yet"
@@ -210,14 +210,15 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             self.current_flame.make_mesh()
         elif s[:2] == "fl": # fl(ame)
             self.current_flame.write_h5()
+        elif s[:2] == "fu": # fu(ll)
+            self.current_flame.write_h5(with_mesh=True)
         elif s[:2] == "nt": # nt(au)
             if self.current_flame.metas.n2_tau is None:
                 print "*** please set N-tau before writing"
                 return
             self.current_flame.write_n_tau()
         elif s[:2] == "al": # al(l)
-            self.current_flame.make_mesh()
-            self.current_flame.write_h5()
+            self.current_flame.write_h5(with_mesh=True)
             if self.current_flame.metas.n2_tau is None:
                 print "*** please set N-tau before writing"
                 return
@@ -233,6 +234,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 > wr(ite) me(sh)|fl(ame)|nt(au)
                 |  mesh  : write hdf5 mesh file
                 |  flame : write hdf5 flame file
+                |  full  : write hdf5 mesh, flame and xmf file
                 |  ntau  : write ascii n-tau file
                 |  all   : write all of the above""")
     help_wr = help_write
@@ -254,19 +256,21 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             print "*** no flames defined yet"
             return
         out = open(s.split()[-1], 'w') if (len(s.split()) > 1) else sys.stdout
+        if out == sys.stdout: print
         if s[:2] == "fl": # fl(ames)
-            out.write("     Name       ndim Volume\n")
+            width = max([len(f.metas.name) for f in self.flames])
+            out.write("Cu   Name" + " "*width + "ndim  Volume\n")
             for i, f in enumerate(self.flames) :
                 star = "*" if f == self.current_flame else " "
-                out.write("{0} {1:2} {2:10} {3}  {4}\n".format(
-                    star, i+1, f.metas.name, f.metas.ndim, f.shape.volume()[0]))
+                out.write("{0} {1:2} {2:{width}}    {3}   {4}\n".format(
+                    star, i+1, f.metas.name, f.metas.ndim, f.shape.volume, width=width+2))
         elif s[:2] == "re": # re(fs)
             out.write("Reference point  : {}\n".format(self.current_flame.metas.ref_point))
             out.write("Reference vector : {}\n".format(self.current_flame.metas.ref_vect))
         elif s[:2] == "me": # me(tas):
             out.write(" Key                  | Value\n")
             out.write(" -------------------------------------------\n")
-            for k, v in self.current_flame.metas.__dict__.iteritems():
+            for k, v in sorted(self.current_flame.metas.__dict__.items()):
                 out.write(" {0:20} | {1}".format(k, v).replace('\n', ' ') + '\n')
         elif s[:2] == "du": # si(ngle_value)
             if out == sys.stdout:

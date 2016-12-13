@@ -31,19 +31,18 @@ class Shape2D(Shape):
     def __init__(self):
         Shape.__init__(self)
         self.ndim = 2
-        assert self.area() > 1.e-12
+        assert self.area > 1.e-12
 
     @abstractmethod
     def area(self):
         pass
-    volume = area
 
 
 class Shape3D(Shape):
     def __init__(self):
         Shape.__init__(self)
         self.ndim = 3
-        assert self.volume() > 1.e-18
+        assert self.volume > 1.e-18
 
     @abstractmethod
     def volume(self):
@@ -59,10 +58,12 @@ class ScatterShape2D(Shape2D):
         self.inside_points = None
         Shape2D.__init__(self)
 
+    @property
     def area(self):
         """Get shape area"""
         # TODO: The real area should be computed...
         return (self.xmax-self.xmin) * (self.ymax-self.ymin)
+    volume = area
 
     def bounding_box(self):
         """Get bounding box for shape"""
@@ -84,6 +85,7 @@ class ScatterShape3D(Shape3D):
         self.inside_points = None
         Shape3D.__init__(self)
 
+    @property
     def volume(self):
         """Get shape volume"""
         # TODO: The real volume should be computed...
@@ -103,22 +105,24 @@ class ScatterShape3D(Shape3D):
 class Parallelogram(Shape2D):
     def __init__(self, xref, vec1, vec2):
         self.xref = xref
-        self.mat = np.array((vec1, vec2))
+        self.mat = np.vstack((vec1, vec2))
         Shape2D.__init__(self)
 
+    @property
     def area(self):
         """Get parallelogram area"""
         return abs(np.linalg.det(self.mat))
+    volume = area
 
     def project(self, x):
         """Project vector x on basis formed by parallelogram
         
-        x = a * vec1 + b * vec2
+        x = a * vec1/||vec1|| + b * vec2/||vec2||
         """
-        x -= self.xref
+        x = np.atleast_2d(x - self.xref)
         den = np.linalg.det(self.mat)
-        num_a = np.linalg.det(np.array((x, self.mat[:,1])).T)
-        num_b = np.linalg.det(np.array((self.mat[:,0], x)).T)
+        num_a = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([m, self.mat[:,1]])), 1, x)
+        num_b = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([self.mat[:,0], m])), 1, x)
         return num_a / den, num_b / den
 
     def is_inside(self, x):
@@ -138,23 +142,27 @@ class Parallelogram(Shape2D):
 class Parallelepiped(Shape3D):
     def __init__(self, xref, vec1, vec2, vec3):
         self.xref = xref
-        self.mat = np.array((vec1, vec2, vec3))
+        self.mat = np.vstack((vec1, vec2, vec3))
         Shape3D.__init__(self)
 
+    @property
     def volume(self):
         """Get parallelogram volume"""
         return abs(np.linalg.det(self.mat))
 
     def project(self, x):
-        """Project vector x on basis formed by parallelogram
+        """Project vector x on basis formed by parallelepiped
         
-        x = a * vec1 + b * vec2 + c * vec3
+        x = a * vec1/||vec1|| + b * vec2/||vec2|| + c * vec3/||vec3||
         """
-        x -= self.xref
+        x = np.atleast_2d(x - self.xref)
         den = np.linalg.det(self.mat)
-        num_a = np.linalg.det(np.array((x, self.mat[:,1], self.mat[:,2])).T)
-        num_b = np.linalg.det(np.array((self.mat[:,0], x, self.mat[:,2])).T)
-        num_c = np.linalg.det(np.array((self.mat[:,0], self.mat[:,1]), x).T)
+        num_a = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([m, self.mat[:,1], self.mat[:,2]])), 1, x)
+        num_b = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([self.mat[:,0], m, self.mat[:,2]])), 1, x)
+        num_c = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([self.mat[:,0], self.mat[:,1], m])), 1, x)
+        #num_a = np.linalg.det(np.array((x, self.mat[:,1], self.mat[:,2])).T)
+        #num_b = np.linalg.det(np.array((self.mat[:,0], x, self.mat[:,2])).T)
+        #num_c = np.linalg.det(np.array((self.mat[:,0], self.mat[:,1]), x).T)
         return num_a / den, num_b / den, num_c / den
 
     def is_inside(self, x):
@@ -164,6 +172,10 @@ class Parallelepiped(Shape3D):
 
     def bounding_box(self):
         """Get bounding box for shape"""
+        print self.xref
+        print self.mat[:,0]
+        print self.mat[:,1]
+        print self.mat[:,2]
         top_pt = self.xref + self.mat[:,0] + self.mat[:,1] + self.mat[:,2]
         return {"xmin": min(self.xref[0], top_pt[0]),
                 "ymin": min(self.xref[1], top_pt[1]),
@@ -179,9 +191,11 @@ class Circle(Shape2D):
         self.radius = radius
         Shape2D.__init__(self)
 
+    @property
     def area(self):
         """Get circle area"""
         return np.pi * self.radius**2
+    volume = area
 
     def distance(self, x):
         """Find distance to circle center"""
@@ -205,6 +219,7 @@ class Sphere(Shape3D):
         self.radius = radius
         Shape3D.__init__(self)
 
+    @property
     def volume(self):
         """Get sphere volume"""
         return 4./3. * np.pi * self.radius**3
@@ -233,6 +248,7 @@ class Cylinder(Shape3D):
         self.vec = vec
         Shape3D.__init__(self)
 
+    @property
     def volume(self):
         """Get cylinder volume"""
         return np.linalg.norm(self.vec) * np.pi * self.radius**2

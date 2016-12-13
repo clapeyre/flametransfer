@@ -32,11 +32,15 @@ class ActiveFlame(object):
         self.log = logging.getLogger(__name__)
         self.debug = True
         self.meshpoints = None
-        self.flame_file = None
         self.shape = None
         self.metas = FlameMetas(name=name)
         self.hip_exec = hip_exec
         self.__dict__.update(kwargs)
+        self._inits()
+
+    def _inits(self):
+        self.mesh_file = 'flame_{0}.mesh.h5'.format(self.metas.name)
+        self.flame_file = "flame_{0}.sol.h5".format(self.metas.name)
 
     def __getstate__(self):
         d = dict(self.__dict__)
@@ -143,7 +147,7 @@ class ActiveFlame(object):
         script = [
                 "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
                 "re hd -a {0} -s dummy_flametrans.h5".format(self.mesh_file),
-                "set in-rim 0.9"
+                "set in-rim 0.5",
                 "in gr 1",
                 "wr hd dummy_flame",
                 "qu",
@@ -190,7 +194,7 @@ class ActiveFlame(object):
     def define_flame_parallelepiped(self, xref, vec1, vec2, vec3):
         """Define flame as parallelepiped"""
         self.metas.generation_method = "analytical3D_parallelepiped"
-        self.shape = Parallelogram(xref, vec1, vec2, vec3)
+        self.shape = Parallelepiped(xref, vec1, vec2, vec3)
         self.metas.shape_params = np.hstack((xref, vec1, vec2, vec3))
         self.make_mesh()
 
@@ -198,24 +202,23 @@ class ActiveFlame(object):
         """Use bounding box to create box mesh containing flame geometry"""
         self.update_metas(**self.shape.bounding_box())
         self.metas.ndim = self.shape.ndim
-        self.mesh_file = 'mesh_{0}.mesh.h5'.format(self.metas.name)
         self.exec_hip(self._get_hip_script_generate())
         self.read_meshpoints()
 
     def _get_hip_script_generate(self):
-        """Generate hip script for mesh generation"""
+        """Write hip script for mesh generation"""
         assert self.metas.xmin is not None
         if self.metas.ndim == 2:
             hip_script = dedent("""\
               ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
-              wr hd ./mesh_{0.name}
+              wr hd ./flame_{0.name}
               qu
               """).format(self.metas)
         elif self.metas.ndim == 3:
             hip_script = dedent("""\
               ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
               co 3d {0.zmin} {0.zmax} {1} z
-              wr hd ./mesh_{0.name}
+              wr hd ./flame_{0.name}
               qu
               """).format(self.metas, self.metas.grid_size - 1)
         return hip_script
@@ -232,23 +235,21 @@ class ActiveFlame(object):
                                             f['/Coordinates/z'].value)).T
             self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:,0].size))
 
-    def _get_hip_script_interpolate(self, src_mesh, src_sol, dest_mesh):
-        """Generate hip script for flame interpolation on new mesh"""
-        hip_script = dedent("""\
-          re hd {src_mesh} {src_sol}
-          re hd {dest_mesh}
-          in gr 1
-          wr hd -s ./sol_{self.metas.name}
-          qu""").format(**locals())
-        return hip_script
+    #def _get_hip_script_interpolate(self, src_mesh, src_sol, dest_mesh):
+    #    """Generate hip script for flame interpolation on new mesh"""
+    #    hip_script = dedent("""\
+    #      re hd {src_mesh} {src_sol}
+    #      re hd {dest_mesh}
+    #      in gr 1
+    #      wr hd -s ./sol_{self.metas.name}
+    #      qu""").format(**locals())
+    #    return hip_script
 
-    def write_h5(self, with_metas=True):
+    def write_h5(self, with_metas=True, with_mesh=False):
         """Write h5 file for flame"""
         assert self.meshpoints is not None
         if self.shape is None: self.recreate_shape()
-        path = "flame_{0}.h5".format(self.metas.name)
-        self.flame_file = path
-        with File(path, 'w') as f:
+        with File(self.flame_file, 'w') as f:
             f.create_group("/Additionals")
             if with_metas: self.metas.write(f["/Additionals"].attrs)
             if 'analytical' in self.metas.generation_method:
@@ -259,7 +260,19 @@ class ActiveFlame(object):
             f['/Parameters/ndim'] = np.array([self.metas.ndim])
             f['/Parameters/nnode'] = np.array([self.meshpoints.size])
             f['/Parameters/versionstring'] = "C3Sm_Flame"
-        return path
+            self.log.info("Wrote flame file to " + self.flame_file)
+        if with_mesh:
+            self.make_mesh()
+            script = [
+                    "re hd -a {0.mesh_file} -s {0.flame_file}".format(self),
+                    "wr hd flame_{0}".format(self.metas.name),
+                    "qu\n"
+                    ]
+            self.exec_hip("\n".join(script))
+            os.remove("flame_{0}.asciiBound".format(self.metas.name))
+            self.log.info(
+                    "Wrote flame and mesh files: flame_{0}.mesh.h5, "
+                    "flame_{0}.mesh.xmf, flame_{0}.sol.h5".format(self.metas.name))
 
     def write_n_tau(self):
         """Write ascii n_tau file for flame"""
