@@ -31,19 +31,21 @@ def input_float(inp):
 class ExitCmd(cmd.Cmd, object):
     def can_exit(self):
         """This can be changed if exit must be protected"""
-	return True
+        return True
 
     def onecmd(self, line):
-	r = super (ExitCmd, self).onecmd(line)
-	if r and (self.can_exit() or
-	   raw_input('exit anyway ? (yes/no):')=='yes'):
-	     return True
-	return False
+        r = super (ExitCmd, self).onecmd(line)
+        if r and (self.can_exit() or
+           raw_input('exit anyway ? (yes/no):')=='yes'):
+             return True
+        return False
 
     def do_exit(self, s):
         """Exit the interpreter."""
         """You can also use the Ctrl-D shortcut."""
-	return True
+        print "\n --- Exiting FlameTransfer. Bye!"
+        sys.exit(0)
+        return True
     do_EOF = do_exit
     do_ex = do_exit
     do_quit = do_exit
@@ -285,6 +287,8 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         else:
             print "*** unknown argument"
             return
+        if out != sys.stdout:
+            out.close()
     do_li = do_list
 
     def help_list(self):

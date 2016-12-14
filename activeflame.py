@@ -78,7 +78,7 @@ class ActiveFlame(object):
                     sys.stdout.flush()
             sys.stdout.write(output.read())
             sys.stdout.flush()
-        print
+        print "\n --- Done executing hip"
 
     def compute_n_crocco(self, n1, area, p_mean, gamma):
         """Define gain (N2) using Crocco's analytical formulation"""
@@ -108,7 +108,6 @@ class ActiveFlame(object):
 
     def define_threshold_flame(self, avbp_mesh, avbp_sol, field, thresh):
         """Define flame from avbp scalar and threshold"""
-        self.metas.generation_method = "avbp_scalar_threshold"
         mesh = File(avbp_mesh, 'r')
         sol = File(avbp_sol, 'r')
         def find_field(name):
@@ -122,15 +121,25 @@ class ActiveFlame(object):
         if 'z' in mesh["Coordinates"].keys():
             z = mesh["Coordinates/z"].value
             z_in = z[above]
-            print x_in.min(), x_in.max(), y_in.min(), y_in.max(), z_in.min(), z_in.max()
+            self.log.debug("Generating 3D flame from AVBP. Bounding box :")
+            self.log.debug(" ".join("{}".format(x) for x in [
+                x_in.min(), x_in.max(),
+                y_in.min(), y_in.max(),
+                z_in.min(), z_in.max()]))
             self.shape = ScatterShape3D(
                     x_in.min(), x_in.max(),
                     y_in.min(), y_in.max(),
                     z_in.min(), z_in.max())
+            self.metas.generation_method = "avbp_scalar_threshold_3D"
         else:
             self.shape = ScatterShape2D(
                     x_in.min(), x_in.max(),
                     y_in.min(), y_in.max())
+            self.log.debug("Generating 2D flame from AVBP. Bounding box :")
+            self.log.debug(" ".join("{}".format(x) for x in [
+                x_in.min(), x_in.max(),
+                y_in.min(), y_in.max()]))
+            self.metas.generation_method = "avbp_scalar_threshold_2D"
         self.make_mesh()
         with File("dummy_avbp.h5", 'w') as f:
             f.create_group
@@ -151,7 +160,7 @@ class ActiveFlame(object):
         script = [
                 "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
                 "re hd -a {0} -s dummy_flametrans.h5".format(self.mesh_file),
-                "set in-rim 0.5",
+                "set in-rim 0.1",
                 "in gr 1",
                 "wr hd dummy_flame",
                 "qu",

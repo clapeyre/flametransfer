@@ -257,18 +257,25 @@ class Cylinder(Shape3D):
         """Project vector x on basis formed by cylinder
         
         Get cylinder axis coord and distance to axis (normalized by ||vec|| and radius)
+        x = axis * vec/||vec|| + r * dist_ax/||dist_ax||
         See http://www.flipcode.com/archives/Fast_Point-In-Cylinder_Test.shtml
         """
         x -= self.xref
-        lengthsqs = np.linalg.norm(self.vec)
-        axis_coord = np.dot(x, self.vec)/lengthsqs
-        r_coord = (np.linalg.norm(x, axis=-1)**2 - axis_coord**2) / self.radius**2
+        lengthsqs = np.linalg.norm(self.vec)**2
+        dot = np.dot(x, self.vec)
+        axis_coord = dot/lengthsqs
+        r_coord = (np.linalg.norm(x, axis=-1)**2 - axis_coord*dot) / self.radius**2
         return axis_coord, r_coord
 
     def is_inside(self, x):
         """Determine if x is inside the cylinder"""
-        x, r = self.project(x)
-        return (x >= 0.) & (x <= 1.) & (r <= 1.)
+        axis, radius = self.project(x)
+        np.savetxt('tmp', x[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)])
+        np.savetxt('tmp2', np.hstack((
+            x[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)],
+            np.atleast_2d(axis[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)]).T,
+            np.atleast_2d(radius[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)]).T)))
+        return (axis >= 0.) & (axis <= 1.) & (radius <= 1.)
 
     def bounding_box(self):
         """Get bounding box for shape"""
