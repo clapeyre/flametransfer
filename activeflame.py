@@ -111,7 +111,11 @@ class ActiveFlame(object):
         mesh = File(avbp_mesh, 'r')
         sol = File(avbp_sol, 'r')
         def find_field(name):
-            if field in name: return name
+            if field.lower() in name.lower(): return name
+        selected_field = sol.visit(find_field)
+        if selected_field is None:
+            print "*** no field containing {0} found in {1}".format(field, avbp_sol)
+            return
         data = sol[sol.visit(find_field)].value
         above = data > np.float(thresh)
         x = mesh["Coordinates/x"].value
