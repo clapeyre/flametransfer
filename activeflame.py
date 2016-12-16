@@ -353,7 +353,7 @@ class ActiveFlame(object):
             vec2 = self.metas.shape_params[6:9]
             vec3 = self.metas.shape_params[9:]
             self.shape = Parallelepiped(xref, vec1, vec2, vec3)
-        elif self.metas.generation_method == "avbp_scalar_threshold":
+        elif avbp_scalar_threshold in self.metas.generation_method:
             if self.metas.ndim == 2:
                 self.shape = ScatterShape2D(
                         self.metas.xmin, self.metas.xmax,
