@@ -370,7 +370,8 @@ class ActiveFlame(object):
                         self.metas.ymin, self.metas.ymax,
                         self.metas.zmin, self.metas.zmax,
                         )
-            self.shape.inside_points = File(path, 'r')['Additionals/n_tau_flag'].value
+            with File(path, 'r') as f:
+                self.shape.inside_points = f['Additionals/n_tau_flag'].value
         else:
             self.log.error("Unknown flame generation method")
             raise ValueError
