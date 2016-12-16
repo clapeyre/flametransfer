@@ -270,11 +270,6 @@ class Cylinder(Shape3D):
     def is_inside(self, x):
         """Determine if x is inside the cylinder"""
         axis, radius = self.project(x)
-        np.savetxt('tmp', x[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)])
-        np.savetxt('tmp2', np.hstack((
-            x[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)],
-            np.atleast_2d(axis[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)]).T,
-            np.atleast_2d(radius[(axis >= 0.) & (axis <= 1.) & (radius <= 1.)]).T)))
         return (axis >= 0.) & (axis <= 1.) & (radius <= 1.)
 
     def bounding_box(self):

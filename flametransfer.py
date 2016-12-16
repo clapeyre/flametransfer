@@ -12,6 +12,7 @@ import cmd
 import copy
 import numpy as np
 
+from os.path import isfile
 from textwrap import dedent
 from StringIO import StringIO
 
@@ -345,15 +346,17 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             if not hasattr(self.current_flame.metas, meta):
                 print "*** unknown meta"
                 return
-            typ = raw_input('Type of the field : ')
+            typ = raw_input('Type of the field : ')[:2].lower()
             val = raw_input('Value             : ')
-            if typ == 'int':
-                self.current_flame.update_metas({meta: int(val)})
-            elif typ == 'float':
-                self.current_flame.update_metas({meta: float(val)})
-            elif typ == 'array':
-                self.current_flame.update_metas({meta: np.array([
-                    float(v) for v in val.split()])})
+            if typ in ['', 'st']:
+                self.current_flame.update_metas(**{meta: val})
+            elif typ == 'in':
+                self.current_flame.update_metas(**{meta: int(val)})
+            elif typ == 'fl':
+                self.current_flame.update_metas(**{meta: float(val)})
+            elif typ == 'ar':
+                self.current_flame.update_metas(
+                        **{meta: np.array([float(v) for v in val.split()])})
             else:
                 print "*** unknown type " + typ
                 return
@@ -413,6 +416,9 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             print "*** invalid number of arguments"
             return
         self.current_flame = ActiveFlame('tmp', self.hip_exec)
+        if not isfile(args[0]):
+            print "*** no such file"
+            return
         if args[-1] == "metas_only":
             self.current_flame.load_metas(args[0])
         else:
@@ -469,5 +475,9 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) == 2:
+        print "*** to execute a script, please feed as input:"
+        print "    $ flametransfer.py < " + sys.argv[1]
+        sys.exit()
     interpreter = FlameTransferCmd()
     interpreter.cmdloop()
