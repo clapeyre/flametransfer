@@ -168,7 +168,13 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             self.current_flame.define_flame_cylinder(center, radius, vector)
         elif args[1].lower()[:2] == "av":
             avbp_mesh = raw_input('AVBP mesh : ')
+            if not isfile(avbp_mesh):
+                print "*** not such file"
+                return
             avbp_sol = raw_input('AVBP sol : ')
+            if not isfile(avbp_sol):
+                print "*** not such file"
+                return
             avbp_field = raw_input('Scalar field : ')
             avbp_thresh = raw_input('Threshold value : ')
             self.current_flame = ActiveFlame(args[0], self.hip_exec)
