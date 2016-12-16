@@ -35,6 +35,7 @@ class ActiveFlame(object):
         self.shape = None
         self.metas = FlameMetas(name=name)
         self.hip_exec = hip_exec
+        self.last_hip_output = ""
         self.__dict__.update(kwargs)
 
     @property
@@ -58,6 +59,7 @@ class ActiveFlame(object):
     def exec_hip(self, script):
         """Execute the current hip script."""
         path = 'script.hip'
+        self.last_hip_output = ""
         with open(path, 'w') as f:
             f.write(script)
         with TemporaryFile() as output:
@@ -74,10 +76,13 @@ class ActiveFlame(object):
                     time.sleep(0.1)
                     output.seek(where)
                 else:
-                    sys.stdout.write(lines)
-                    sys.stdout.flush()
-            sys.stdout.write(output.read())
-            sys.stdout.flush()
+                    self.last_hip_output += lines
+            self.last_hip_output += output.read()
+            if process.wait() != 0:
+                print "*** error in hip script. See log"
+            self.log.debug("Hip execution log")
+            for line in self.last_hip_output.split('\n'):
+                self.log.debug(line)
         print "\n --- Done executing hip"
 
     def compute_n_crocco(self, n1, area, p_mean, gamma):
@@ -353,7 +358,7 @@ class ActiveFlame(object):
             vec2 = self.metas.shape_params[6:9]
             vec3 = self.metas.shape_params[9:]
             self.shape = Parallelepiped(xref, vec1, vec2, vec3)
-        elif avbp_scalar_threshold in self.metas.generation_method:
+        elif "avbp_scalar_threshold" in self.metas.generation_method:
             if self.metas.ndim == 2:
                 self.shape = ScatterShape2D(
                         self.metas.xmin, self.metas.xmax,
