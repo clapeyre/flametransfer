@@ -16,6 +16,46 @@ def intersect(start1, end1, start2, end2):
     num = np.linalg.det(np.array((start2 - start1, end2 - start2)))
     return start1 + num / den * (end1 - start1)
 
+class Vector(object):
+    def __init__(self, ndim, *coords):
+        self.ndim = ndim
+        if self.ndim == 2:
+            self.vect = np.array([[coords[0]], [coords[1]]])
+        else:
+            self.vect = np.array([[coords[0]], [coords[1]], [coords[2]]])
+
+    def translate(self, vect):
+        self.vect += np.array(vect).reshape(-1, 1)
+
+    def scale(self, vect):
+        vect = np.array(vect)
+        assert all(abs(vect) > 1e-16), "Scaling must not have 0 value"
+        self.vect *= vect.reshape(-1, 1)
+
+    def mirror(self, axis):
+        axis_dict = {'x':1, 'y':2, 'z':3}
+        self.vect[axis_dict[axis]] *= -1
+
+    def rotate(self, axis, angle):
+        angle *= np.pi/180.
+        if self.ndim == 2:
+            rotate = np.mat([[math.cos(angle), -math.sin(angle)],
+                             [math.sin(angle), math.cos(angle)]])
+        else:
+            if axis == 'x':
+                rotate = np.mat([[1, 0, 0],
+                                 [0, math.cos(angle), -math.sin(angle)],
+                                 [0, math.sin(angle), math.cos(angle)]])
+            elif axis == 'y':
+                rotate = np.mat([[math.cos(angle), 0, math.sin(angle)],
+                                 [0, 1, 0],
+                                 [-math.sin(angle), 0, math.cos(angle)]])
+            elif axis == 'z':
+                rotate = np.mat([[math.cos(angle), -math.sin(angle), 0],
+                                 [math.sin(angle), math.cos(angle), 0],
+                                 [0, 0, 1]])
+        self.vect = rotate * self.vect[:]
+
 
 class Shape(object):
     @abstractmethod
@@ -185,7 +225,7 @@ class Parallelepiped(Shape3D):
                 "zmax": max(self.xref[2], top_pt[2])}
 
 
-class Circle(Shape2D):
+class Disc(Shape2D):
     def __init__(self, center, radius):
         self.xref = center
         self.radius = radius
@@ -193,16 +233,16 @@ class Circle(Shape2D):
 
     @property
     def area(self):
-        """Get circle area"""
+        """Get disc area"""
         return np.pi * self.radius**2
     volume = area
 
     def distance(self, x):
-        """Find distance to circle center"""
+        """Find distance to disc center"""
         return np.linalg.norm(x - self.xref, axis=-1)
 
     def is_inside(self, x):
-        """Determine if x is inside the circle"""
+        """Determine if x is inside the disc"""
         return (self.distance(x) <= self.radius)
 
     def bounding_box(self):
@@ -229,7 +269,7 @@ class Sphere(Shape3D):
         return np.linalg.norm(x - self.xref, axis=-1)
 
     def is_inside(self, x):
-        """Determine if x is inside the circle"""
+        """Determine if x is inside the sphere"""
         return (self.distance(x) <= self.radius)
 
     def bounding_box(self):
@@ -274,14 +314,20 @@ class Cylinder(Shape3D):
 
     def bounding_box(self):
         """Get bounding box for shape"""
-        bb1 = Sphere(self.xref, self.radius).bounding_box()
-        bb2 = Sphere(self.xref + self.vec, self.radius).bounding_box()
-        return {"xmin": min(bb1["xmin"], bb2["xmin"]),
-                "ymin": min(bb1["ymin"], bb2["ymin"]),
-                "zmin": min(bb1["zmin"], bb2["zmin"]),
-                "xmax": max(bb1["xmax"], bb2["xmax"]),
-                "ymax": max(bb1["ymax"], bb2["ymax"]),
-                "zmax": max(bb1["zmax"], bb2["zmax"])}
+        def min_max_cyl(axis):
+            length = np.linalg.norm(self.vec)
+            proj = self.radius * np.sqrt(1 - self.vec[axis]**2 / length**2)
+            four_pts = [self.xref[axis] + proj,
+                        self.xref[axis] - proj,
+                        self.xref[axis] + self.vec[axis] + proj,
+                        self.xref[axis] + self.vec[axis] - proj
+                       ]
+            return min(four_pts)[0], max(four_pts)[0]
+        out = {}
+        out["xmin"], out["xmax"] = min_max_cyl(0)
+        out["ymin"], out["ymax"] = min_max_cyl(1)
+        out["zmin"], out["zmax"] = min_max_cyl(2)
+        return out
     
     
 class rotation():
