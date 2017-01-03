@@ -21,10 +21,8 @@ from textwrap import dedent
 from StringIO import StringIO
 from tempfile import TemporaryFile
 
-from geometry import Parallelepiped, Sphere, Cylinder, Parallelogram, Circle, ScatterShape2D, ScatterShape3D
-
-GRID_SIZE = 32
-VERSION = "0.1"
+from geometry import Parallelepiped, Sphere, Cylinder, Parallelogram, Disc, ScatterShape2D, ScatterShape3D
+from flamemetas import FlameMetas, VERSION
 
 class ActiveFlame(object):
     """Flame holder class associated to a flame hdf5 file"""
@@ -60,6 +58,8 @@ class ActiveFlame(object):
         """Execute the current hip script."""
         path = 'script.hip'
         self.last_hip_output = ""
+        self.log.debug("Executing hip script:") 
+        [self.log.debug(" > " + line) for line in script.split('\n')]
         with open(path, 'w') as f:
             f.write(script)
         with TemporaryFile() as output:
@@ -157,7 +157,7 @@ class ActiveFlame(object):
             f.create_group("/Parameters")
             f['/Parameters/ndim'] = np.array([self.metas.ndim])
             f['/Parameters/nnode'] = np.array([self.meshpoints.size])
-            f['/Parameters/versionstring'] = "C3Sm_Flame"
+            f['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
         with File("dummy_flametrans.h5", 'w') as f:
             f.create_group
             f.create_group("/Additionals")
@@ -165,7 +165,7 @@ class ActiveFlame(object):
             f.create_group("/Parameters")
             f['/Parameters/ndim'] = np.array([self.metas.ndim])
             f['/Parameters/nnode'] = np.array([self.meshpoints.size])
-            f['/Parameters/versionstring'] = "C3Sm_Flame"
+            f['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
         script = [
                 "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
                 "re hd -a {0} -s dummy_flametrans.h5".format(self.mesh_file),
@@ -184,10 +184,10 @@ class ActiveFlame(object):
             os.remove("dummy_flame.mesh.h5")
             os.remove("dummy_flame.asciiBound")
 
-    def define_flame_circle(self, center, radius):
+    def define_flame_disc(self, center, radius):
         """Define flame as parallelogram"""
-        self.metas.generation_method = "analytical2D_circle"
-        self.shape = Circle(center, radius)
+        self.metas.generation_method = "analytical2D_disc"
+        self.shape = Disc(center, radius)
         self.metas.shape_params = np.hstack((center, radius))
         self.make_mesh()
 
@@ -222,27 +222,83 @@ class ActiveFlame(object):
 
     def make_mesh(self):
         """Use bounding box to create box mesh containing flame geometry"""
-        self.update_metas(**self.shape.bounding_box())
-        self.metas.ndim = self.shape.ndim
+        self.update_metas(ndim=self.shape.ndim, **self.shape.bounding_box())
         self.exec_hip(self._get_hip_script_generate())
         self.read_meshpoints()
 
     def _get_hip_script_generate(self):
         """Write hip script for mesh generation"""
         assert self.metas.xmin is not None
+        print 'XXX', self.metas.transforms
+        transforms = "\n".join([
+            self._get_hip_transform(trans, *args)
+            for trans, args in self.metas.transforms])
         if self.metas.ndim == 2:
             hip_script = dedent("""\
               ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
+              {1}
               wr hd ./flame_{0.name}
               qu
-              """).format(self.metas)
+              """).format(self.metas, transforms)
         elif self.metas.ndim == 3:
             hip_script = dedent("""\
               ge {0.xmin} {0.ymin} {0.xmax} {0.ymax} {0.grid_size} {0.grid_size}
-              co 3d {0.zmin} {0.zmax} {1} z
+              co 3d {0.zmin} {0.zmax} {2} z
+              {1}
               wr hd ./flame_{0.name}
               qu
-              """).format(self.metas, self.metas.grid_size - 1)
+              """).format(self.metas, transforms, self.metas.grid_size - 1)
+        return hip_script
+
+    def _get_hip_transform(self, transformation, *args):
+        """Get the hip sub-script for transformations, and apply to ref_point"""
+        print 'YYY', transformation, args
+        arg_string = " ".join(str(v) for v in args)
+        if transformation[:2] == "tr":
+            return "tr tr {}".format(arg_string)
+        elif transformation[:2] == "sc":
+            return "tr sc {}".format(arg_string)
+        elif transformation[:2] == "ro":
+            return "tr ro {}".format(arg_string)
+        elif transformation[:2] == "mi":
+            return "tr re {}".format(arg_string)
+
+    def add_transform(self, transformation, args):
+        """Add transformation operation"""
+        self.metas.transforms.append((transformation[:2], args))
+        self.metas.apply_trans()
+
+    def delete_transform(self, nb=None):
+        """Remove transformation operation"""
+        if nb is not None:
+            del self.metas.transforms[nb]
+        else:
+            self.metas.transforms = []
+        self.metas.apply_trans()
+
+    def export_avsp(self, avsp_mesh, avsp_sol):
+        """Export flame to AVSP solution"""
+        self.make_mesh()
+        self.write_h5()
+        self.exec_hip(self._get_hip_script_export_avsp(avsp_mesh, avsp_sol))
+
+    def _get_hip_script_export_avsp(self, avsp_mesh, avsp_sol):
+        """Generate hip script for flame interpolation on AVSP mesh"""
+        hip_script = dedent("""\
+          se ch 0
+          re hd -a flame_{0}.mesh.h5 -s flame_{0}.sol.h5
+          re hd -a {1} -s {2}
+          in gr 1
+          zone add secteur 
+          zone 1 element add all 
+          zo 1 solparam add Ptref vec {3}
+          zo 1 solparam add Unref vec {4}
+          wr hd avsp_sol
+          ex
+          """).format(self.metas.name, avsp_mesh, avsp_sol,
+                      " ".join(str(s) for s in self.metas.ref_point),
+                      " ".join(str(s) for s in self.metas.ref_vect),
+                      )
         return hip_script
 
     def read_meshpoints(self):
@@ -257,23 +313,13 @@ class ActiveFlame(object):
                                             f['/Coordinates/z'].value)).T
             self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:,0].size))
 
-    #def _get_hip_script_interpolate(self, src_mesh, src_sol, dest_mesh):
-    #    """Generate hip script for flame interpolation on new mesh"""
-    #    hip_script = dedent("""\
-    #      re hd {src_mesh} {src_sol}
-    #      re hd {dest_mesh}
-    #      in gr 1
-    #      wr hd -s ./sol_{self.metas.name}
-    #      qu""").format(**locals())
-    #    return hip_script
-
     def write_h5(self, with_metas=True, with_mesh=False):
         """Write h5 file for flame"""
         assert self.meshpoints is not None
         if self.shape is None: self.recreate_shape()
         with File(self.flame_file, 'w') as f:
             f.create_group("/Additionals")
-            if with_metas: self.metas.write(f["/Additionals"].attrs)
+            if with_metas: self.metas.write_h5(f["/Additionals"].attrs)
             if 'analytical' in self.metas.generation_method:
                 f['/Additionals/n_tau_flag'] = 1.0*self.shape.is_inside(self.meshpoints)
             else:
@@ -281,7 +327,7 @@ class ActiveFlame(object):
             f.create_group("/Parameters")
             f['/Parameters/ndim'] = np.array([self.metas.ndim])
             f['/Parameters/nnode'] = np.array([self.meshpoints.size])
-            f['/Parameters/versionstring'] = "C3Sm_Flame"
+            f['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
             self.log.info("Wrote flame file to " + self.flame_file)
         if with_mesh:
             self.make_mesh()
@@ -293,7 +339,7 @@ class ActiveFlame(object):
             self.exec_hip("\n".join(script))
             if with_metas:
                 with File(self.flame_file, 'a') as f:
-                    self.metas.write(f["/Additionals"].attrs)
+                    self.metas.write_h5(f["/Additionals"].attrs)
             os.remove("flame_{0}.asciiBound".format(self.metas.name))
             self.log.info(
                     "Wrote flame and mesh files: flame_{0}.mesh.h5, "
@@ -334,10 +380,10 @@ class ActiveFlame(object):
     def recreate_shape(self, path):
         """Create self.shape again based on metas"""
         self.log.info("Recreating shape " + self.metas.generation_method)
-        if self.metas.generation_method == "analytical2D_circle":
+        if self.metas.generation_method == "analytical2D_disc":
             center = self.metas.shape_params[:2]
             radius = self.metas.shape_params[2]
-            self.shape = Circle(center, radius)
+            self.shape = Disc(center, radius)
         elif self.metas.generation_method == "analytical2D_parallelogram":
             xref = self.metas.shape_params[:2]
             vec1 = self.metas.shape_params[2:4]
@@ -377,39 +423,3 @@ class ActiveFlame(object):
             raise ValueError
 
 
-class FlameMetas(object):
-    """Meta data associated to a flame"""
-    def __init__(self, **kwargs):
-        self.name = None
-        self.ndim = None
-        self.xmin = None
-        self.xmax = None
-        self.ymin = None
-        self.ymax = None
-        self.zmin = None
-        self.zmax = None
-        self.ref_point = None
-        self.ref_vect = None
-        self.geom_ref_point = None
-        self.geom_ref_vect = None
-        self.n2_tau = None
-        self.q_bar = None
-        self.u_bar = None
-        self.shape_params = None
-        self.generation_method = None
-        self.grid_size = GRID_SIZE
-        self.version = VERSION
-        self.__dict__.update(**kwargs)
-
-    def write(self, attribute):
-        """Write to hdf5 attributes and check mandatories are filled"""
-        mandatory_attrs = ("xmin xmax ymin ymax ref_point ref_vect n2_tau" 
-                           "generation_method").split()
-        for key, value in self.__dict__.iteritems():
-            if key in mandatory_attrs: assert value is not None
-            if value is not None: attribute[key] = value
-
-    def load(self, attribute):
-        """Load self from hdf5 attribute"""
-        for key, value in attribute.iteritems():
-            setattr(self, key, value)
