@@ -16,28 +16,18 @@ def intersect(start1, end1, start2, end2):
     num = np.linalg.det(np.array((start2 - start1, end2 - start2)))
     return start1 + num / den * (end1 - start1)
 
+
 class Vector(object):
-    def __init__(self, ndim, *coords):
-        self.ndim = ndim
-        if self.ndim == 2:
-            self.vect = np.array([[coords[0]], [coords[1]]])
-        else:
-            self.vect = np.array([[coords[0]], [coords[1]], [coords[2]]])
+    """Base vector type"""
+    def __init__(self, vect):
+        self.ndim = len(vect)
+        self.vect = np.array(vect).reshape(-1, 1)
+        self.length = np.linalg.norm(self.vect)
 
-    def translate(self, vect):
-        self.vect += np.array(vect).reshape(-1, 1)
+    def __call__(self): return self.vect.reshape(-1)
 
-    def scale(self, vect):
-        vect = np.array(vect)
-        assert all(abs(vect) > 1e-16), "Scaling must not have 0 value"
-        self.vect *= vect.reshape(-1, 1)
-
-    def mirror(self, axis):
-        axis_dict = {'x':1, 'y':2, 'z':3}
-        self.vect[axis_dict[axis]] *= -1
-
-    def rotate(self, axis, angle):
-        angle *= np.pi/180.
+    def rotate(self, axis, angle, degrees=True):
+        if degrees: angle *= np.pi/180.
         if self.ndim == 2:
             rotate = np.mat([[math.cos(angle), -math.sin(angle)],
                              [math.sin(angle), math.cos(angle)]])
@@ -56,97 +46,120 @@ class Vector(object):
                                  [0, 0, 1]])
         self.vect = rotate * self.vect[:]
 
+    def scale(self, vect):
+        """Scale (negative accepted, 0 refused)"""
+        vect = np.array(vect)
+        assert all(abs(vect) > 1e-15), "Scaling must not have 0 value"
+        self.vect *= vect.reshape(-1, 1)
+
+    def translate(self, vect):
+        """Vectors are not affected by translation"""
+        pass
+
+
+class NormalVector(Vector):
+    """More restrictive vector type"""
+    def __init__(self, vect):
+        Vector.__init__(self, vect)
+        assert self.length > 1e-15, "Vector cannot have 0 length "
+        self.vect /= self.length
+
+    def scale(self, vect):
+        """Normalized vectors are not scalable"""
+        pass
+
+
+class Point(Vector):
+    def translate(self, vect):
+        """Points are affected by translation"""
+        self.vect += np.array(vect).reshape(-1, 1)
+
 
 class Shape(object):
-    @abstractmethod
-    def is_inside(self, x):
-        pass
+    def __init__(self, ndim):
+        self.ndim = ndim
+        self.vects = {}
 
-    @abstractmethod
-    def bounding_box(self):
-        pass
+    def rotate(self, axis, angle, degrees=True):
+        [p.rotate(axis, angle, degrees) for p in self.vects.values()]
+
+    def scale(self, vect):
+        [p.scale(vect) for p in self.vects.values()]
+
+    def translate(self, vect):
+        [p.translate(vect) for p in self.vects.values()]
 
 
 class Shape2D(Shape):
     def __init__(self):
-        Shape.__init__(self)
-        self.ndim = 2
-        assert self.area > 1.e-12
+        Shape.__init__(self, 2)
 
-    @abstractmethod
-    def area(self):
-        pass
+    def check(self):
+        assert self.area > 1.e-12
 
 
 class Shape3D(Shape):
     def __init__(self):
-        Shape.__init__(self)
-        self.ndim = 3
-        assert self.volume > 1.e-18
+        Shape.__init__(self, 3)
 
-    @abstractmethod
-    def volume(self):
-        pass
+    def check(self):
+        assert self.volume > 1.e-18
 
 
 class ScatterShape2D(Shape2D):
-    def __init__(self, xmin, xmax, ymin, ymax):
-        self.xmin = xmin
-        self.ymin = ymin
-        self.xmax = xmax
-        self.ymax = ymax
-        self.inside_points = None
+    def __init__(self, pt_min, pt_max):
         Shape2D.__init__(self)
+        self.vects["pt_min"] = Point(pt_min)
+        self.vects["pt_max"] = Point(pt_max)
+        self.inside_points = None
+        self.check()
 
     @property
     def area(self):
         """Get shape area"""
         # TODO: The real area should be computed...
-        return (self.xmax-self.xmin) * (self.ymax-self.ymin)
+        pt_min = self.vects["pt_min"]()
+        pt_max = self.vects["pt_max"]()
+        return np.prod(pt_max - p_min)
     volume = area
-
-    def bounding_box(self):
-        """Get bounding box for shape"""
-        return {"xmin": self.xmin,
-                "ymin": self.ymin,
-                "xmax": self.xmax,
-                "ymax": self.ymax,
-                }
 
 
 class ScatterShape3D(Shape3D):
-    def __init__(self, xmin, xmax, ymin, ymax, zmin, zmax):
-        self.xmin = xmin
-        self.ymin = ymin
-        self.xmax = xmax
-        self.ymax = ymax
-        self.zmin = zmin
-        self.zmax = zmax
-        self.inside_points = None
+    def __init__(self, pt_min, pt_max):
         Shape3D.__init__(self)
+        self.vects["pt_min"] = Point(pt_min)
+        self.vects["pt_max"] = Point(pt_max)
+        self.inside_points = None
+        self.check()
 
     @property
     def volume(self):
         """Get shape volume"""
         # TODO: The real volume should be computed...
-        return (self.xmax-self.xmin) * (self.ymax-self.ymin) * (self.zmax-self.zmin)
-
-    def bounding_box(self):
-        """Get bounding box for shape"""
-        return {"xmin": self.xmin,
-                "ymin": self.ymin,
-                "zmin": self.zmin,
-                "xmax": self.xmax,
-                "ymax": self.ymax,
-                "zmax": self.zmax,
-                }
+        pt_min = self.vects["pt_min"]()
+        pt_max = self.vects["pt_max"]()
+        return np.prod(pt_max - p_min)
 
 
 class Parallelogram(Shape2D):
     def __init__(self, xref, vec1, vec2):
-        self.xref = xref
-        self.mat = np.vstack((vec1, vec2))
         Shape2D.__init__(self)
+        self.vects["xref"] = Point(xref)
+        self.vects["vec1"] = Vector(vec1)
+        self.vects["vec2"] = Vector(vec2)
+        self.check()
+        self.bounding_box()
+
+    @property
+    def mat(self): return np.vstack((self.vects["vec1"](),
+                                     self.vects["vec2"](),))
+
+    def bounding_box(self):
+        """Set bounding box for shape"""
+        xref = self.vects["xref"]()
+        top_pt = xref + self.vects["vec1"]() + self.vects["vec2"]()
+        self.vects["pt_min"] = Point([min(xref[0], top_pt[0]), min(xref[1], top_pt[1])])
+        self.vects["pt_max"] = Point([max(xref[0], top_pt[0]), max(xref[1], top_pt[1])])
 
     @property
     def area(self):
@@ -159,10 +172,12 @@ class Parallelogram(Shape2D):
         
         x = a * vec1/||vec1|| + b * vec2/||vec2||
         """
-        x = np.atleast_2d(x - self.xref)
+        x = np.atleast_2d(x - self.vects["xref"]())
         den = np.linalg.det(self.mat)
-        num_a = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([m, self.mat[:,1]])), 1, x)
-        num_b = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([self.mat[:,0], m])), 1, x)
+        num_a = np.apply_along_axis(
+                lambda m: np.linalg.det(np.vstack([m, self.mat[:,1]])), 1, x)
+        num_b = np.apply_along_axis(
+                lambda m: np.linalg.det(np.vstack([self.mat[:,0], m])), 1, x)
         return num_a / den, num_b / den
 
     def is_inside(self, x):
@@ -170,20 +185,32 @@ class Parallelogram(Shape2D):
         a, b = self.project(x)
         return (a <= 1) & (a >= 0) & (b <= 1) & (b >= 0)
 
-    def bounding_box(self):
-        """Get bounding box for shape"""
-        top_pt = self.xref + self.mat[:,0] + self.mat[:,1]
-        return {"xmin": min(self.xref[0], top_pt[0]),
-                "ymin": min(self.xref[1], top_pt[1]),
-                "xmax": max(self.xref[0], top_pt[0]),
-                "ymax": max(self.xref[1], top_pt[1])}
-
 
 class Parallelepiped(Shape3D):
     def __init__(self, xref, vec1, vec2, vec3):
-        self.xref = xref
-        self.mat = np.vstack((vec1, vec2, vec3))
         Shape3D.__init__(self)
+        self.vects["xref"] = Point(xref)
+        self.vects["vec1"] = Vector(vec1)
+        self.vects["vec2"] = Vector(vec2)
+        self.vects["vec3"] = Vector(vec3)
+        self.check()
+        self.bounding_box()
+
+    @property
+    def mat(self): return np.vstack((self.vects["vec1"](),
+                                     self.vects["vec2"](),
+                                     self.vects["vec3"](),))
+
+    def bounding_box(self):
+        """Set bounding box for shape"""
+        xref = self.vects["xref"]()
+        top_pt = xref + self.vects["vec1"]() + self.vects["vec2"]() + self.vects["vec3"]()
+        self.vects["pt_min"] = Point([min(xref[0], top_pt[0]),
+                                      min(xref[1], top_pt[1]),
+                                      min(xref[2], top_pt[2])])
+        self.vects["pt_max"] = Point([max(xref[0], top_pt[0]),
+                                      max(xref[1], top_pt[1]),
+                                      max(xref[2], top_pt[2])])
 
     @property
     def volume(self):
@@ -195,14 +222,14 @@ class Parallelepiped(Shape3D):
         
         x = a * vec1/||vec1|| + b * vec2/||vec2|| + c * vec3/||vec3||
         """
-        x = np.atleast_2d(x - self.xref)
+        x = np.atleast_2d(x - self.vects["xref"]())
         den = np.linalg.det(self.mat)
-        num_a = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([m, self.mat[:,1], self.mat[:,2]])), 1, x)
-        num_b = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([self.mat[:,0], m, self.mat[:,2]])), 1, x)
-        num_c = np.apply_along_axis(lambda m: np.linalg.det(np.vstack([self.mat[:,0], self.mat[:,1], m])), 1, x)
-        #num_a = np.linalg.det(np.array((x, self.mat[:,1], self.mat[:,2])).T)
-        #num_b = np.linalg.det(np.array((self.mat[:,0], x, self.mat[:,2])).T)
-        #num_c = np.linalg.det(np.array((self.mat[:,0], self.mat[:,1]), x).T)
+        num_a = np.apply_along_axis(
+                lambda m: np.linalg.det(np.vstack([m, self.mat[:,1], self.mat[:,2]])), 1, x)
+        num_b = np.apply_along_axis(
+                lambda m: np.linalg.det(np.vstack([self.mat[:,0], m, self.mat[:,2]])), 1, x)
+        num_c = np.apply_along_axis(
+                lambda m: np.linalg.det(np.vstack([self.mat[:,0], self.mat[:,1], m])), 1, x)
         return num_a / den, num_b / den, num_c / den
 
     def is_inside(self, x):
@@ -210,26 +237,19 @@ class Parallelepiped(Shape3D):
         a, b, c = self.project(x)
         return (a <= 1 ) & (a >= 0) & (b <= 1) & (b >= 0) & (c <= 1) & (c >= 0)
 
-    def bounding_box(self):
-        """Get bounding box for shape"""
-        print self.xref
-        print self.mat[:,0]
-        print self.mat[:,1]
-        print self.mat[:,2]
-        top_pt = self.xref + self.mat[:,0] + self.mat[:,1] + self.mat[:,2]
-        return {"xmin": min(self.xref[0], top_pt[0]),
-                "ymin": min(self.xref[1], top_pt[1]),
-                "zmin": min(self.xref[2], top_pt[2]),
-                "xmax": max(self.xref[0], top_pt[0]),
-                "ymax": max(self.xref[1], top_pt[1]),
-                "zmax": max(self.xref[2], top_pt[2])}
-
 
 class Disc(Shape2D):
     def __init__(self, center, radius):
-        self.xref = center
-        self.radius = radius
         Shape2D.__init__(self)
+        self.vects["center"] = Point(center)
+        self.radius = radius
+        self.check()
+        self.bounding_box()
+
+    def bounding_box(self):
+        """Set bounding box for shape"""
+        self.vects["pt_min"] = self.vects["center"]() - self.radius
+        self.vects["pt_max"] = self.vects["center"]() + self.radius
 
     @property
     def area(self):
@@ -239,25 +259,25 @@ class Disc(Shape2D):
 
     def distance(self, x):
         """Find distance to disc center"""
-        return np.linalg.norm(x - self.xref, axis=-1)
+        return np.linalg.norm(x - self.vects["center"](), axis=-1)
 
     def is_inside(self, x):
         """Determine if x is inside the disc"""
         return (self.distance(x) <= self.radius)
 
-    def bounding_box(self):
-        """Get bounding box for shape"""
-        min_point = self.xref - self.radius
-        max_point = self.xref + self.radius
-        return {"xmin": min_point[0], "xmax": max_point[0],
-                "ymin": min_point[1], "ymax": max_point[1]}
-
 
 class Sphere(Shape3D):
     def __init__(self, center, radius):
-        self.xref = center
-        self.radius = radius
         Shape3D.__init__(self)
+        self.vects["center"] = Point(center)
+        self.radius = radius
+        self.check()
+        self.bounding_box()
+
+    def bounding_box(self):
+        """Set bounding box for shape"""
+        self.vects["pt_min"] = self.vects["center"]() - self.radius
+        self.vects["pt_max"] = self.vects["center"]() + self.radius
 
     @property
     def volume(self):
@@ -266,44 +286,56 @@ class Sphere(Shape3D):
 
     def distance(self, x):
         """Find distance to sphere center"""
-        return np.linalg.norm(x - self.xref, axis=-1)
+        return np.linalg.norm(x - self.vects["center"](), axis=-1)
 
     def is_inside(self, x):
         """Determine if x is inside the sphere"""
         return (self.distance(x) <= self.radius)
 
-    def bounding_box(self):
-        """Get bounding box for shape"""
-        min_point = self.xref - self.radius
-        max_point = self.xref + self.radius
-        return {"xmin": min_point[0], "xmax": max_point[0],
-                "ymin": min_point[1], "ymax": max_point[1],
-                "zmin": min_point[2], "zmax": max_point[2]}
-
 
 class Cylinder(Shape3D):
     def __init__(self, center, radius, vec):
-        self.xref = center
-        self.radius = radius
-        self.vec = vec
         Shape3D.__init__(self)
+        self.vects["xref"] = Point(center)
+        self.vects["vec"] = Vector(vec)
+        self.radius = radius
+        self.check()
+        self.bounding_box()
+
+    def bounding_box(self):
+        """Set bounding box for shape"""
+        def min_max_cyl(axis):
+            xref_axis = self.vects["xref"]()[axis]
+            vec_axis = self.vects["vec"]()[axis]
+            length = np.linalg.norm(self.vects["vec"]())
+            proj = self.radius * np.sqrt(1 - vec_axis**2 / length**2)
+            four_pts = [xref_axis + proj,
+                        xref_axis - proj,
+                        xref_axis + vec_axis + proj,
+                        xref_axis + vec_axis - proj
+                       ]
+            return min(four_pts)[0], max(four_pts)[0]
+        xmin, xmax = min_max_cyl(0)
+        ymin, ymax = min_max_cyl(1)
+        zmin, zmax = min_max_cyl(2)
+        self.vects["pt_min"] = Point([xmin, ymin, zmin])
+        self.vects["pt_max"] = Point([xmax, ymax, zmax])
 
     @property
     def volume(self):
         """Get cylinder volume"""
-        return np.linalg.norm(self.vec) * np.pi * self.radius**2
+        return (np.linalg.norm(self.vects["vec"]()) * np.pi * self.radius**2)[0]
 
     def project(self, x):
         """Project vector x on basis formed by cylinder
         
-        Get cylinder axis coord and distance to axis (normalized by ||vec|| and radius)
+        Get cylinder axis coord (from xref) and distance to axis (normalized by ||vec|| and radius)
         x = axis * vec/||vec|| + r * dist_ax/||dist_ax||
         See http://www.flipcode.com/archives/Fast_Point-In-Cylinder_Test.shtml
         """
-        x -= self.xref
-        lengthsqs = np.linalg.norm(self.vec)**2
-        dot = np.dot(x, self.vec)
-        axis_coord = dot/lengthsqs
+        x -= self.vects["xref"]()
+        dot = np.dot(x, self.vects["vec"]())
+        axis_coord = dot / self.vects["vec"].length**2
         r_coord = (np.linalg.norm(x, axis=-1)**2 - axis_coord*dot) / self.radius**2
         return axis_coord, r_coord
 
@@ -311,23 +343,6 @@ class Cylinder(Shape3D):
         """Determine if x is inside the cylinder"""
         axis, radius = self.project(x)
         return (axis >= 0.) & (axis <= 1.) & (radius <= 1.)
-
-    def bounding_box(self):
-        """Get bounding box for shape"""
-        def min_max_cyl(axis):
-            length = np.linalg.norm(self.vec)
-            proj = self.radius * np.sqrt(1 - self.vec[axis]**2 / length**2)
-            four_pts = [self.xref[axis] + proj,
-                        self.xref[axis] - proj,
-                        self.xref[axis] + self.vec[axis] + proj,
-                        self.xref[axis] + self.vec[axis] - proj
-                       ]
-            return min(four_pts)[0], max(four_pts)[0]
-        out = {}
-        out["xmin"], out["xmax"] = min_max_cyl(0)
-        out["ymin"], out["ymax"] = min_max_cyl(1)
-        out["zmin"], out["zmax"] = min_max_cyl(2)
-        return out
     
     
 class rotation():

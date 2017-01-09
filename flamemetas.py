@@ -7,116 +7,106 @@ Created January 2017 by COOP team
 
 import json
 
+from collections import OrderedDict
 from numpy import array as nparray
 
-from geometry import Vector
+import geometry
 
 GRID_SIZE = 32
-VERSION = "17.1"
+VERSION = "17.01"
 
 class FlameMetas(object):
     """Meta data associated to a flame"""
     def __init__(self, **kwargs):
-        self.name = None
-        self.ndim = None
-        self.xmin = None
-        self.xmax = None
-        self.ymin = None
-        self.ymax = None
-        self.zmin = None
-        self.zmax = None
-        self.ref_point = None
-        self.ref_vect = None
-        self.geom_ref_point = None
-        self.geom_ref_vect = None
-        self.n2_tau = None
-        self.q_bar = None
-        self.u_bar = None
-        self.shape_params = None
-        self.generation_method = None
-        self.ignored = ["ignored"]
-        self.transforms = []
-        self.grid_size = GRID_SIZE
-        self.version = VERSION
-        self.__dict__.update(**kwargs)
+        # Override of __setattr__ prevents declarations here. 
+        # Calling object.__setattr__ is an approved workaround 
+        object.__setattr__(self, "mandatory_vals",
+                           "name version grid_size ndim generation_method "
+                           "n2_tau".split())
+        object.__setattr__(self, "mandatory_vecs", 
+                           "pt_min pt_max pt_ref vec_ref".split())
+        object.__setattr__(self, "static", OrderedDict((
+                             (val, None) for val in self.mandatory_vals)))
+        object.__setattr__(self, "vects", OrderedDict((
+                             (vec, None) for vec in self.mandatory_vecs)))
+        self.static["version"] = VERSION
+        self.static["grid_size"] = GRID_SIZE
+        self.static.update(**kwargs)
+
+    def __setattr__(self, name, value):
+        """Override set attribute behavior
+        
+        Everything goes to static, except if already in self.vects
+        See set_vect to ensure value goes to self.vects
+        """
+        if name in self.vects.keys():
+            self.vects[name] = value
+        else:
+            self.static[name] = value
+
+    def __getattr__(self, name):
+        """Override get attribute behavior
+        
+        Look for attributes in static and vects. None other are accepted
+        """
+        if name in self.static.keys():
+            return self.static[name]
+        elif name in self.vects.keys():
+            if self.vects[name] is None:
+                return self.vects[name]
+            else:
+                return self.vects[name]()
+        else:
+            raise AttributeError(name)
+
+    def set_vect(self, name, vect):
+        """Set new attribute ensured to be a vector"""
+        self.vects[name] = vect
 
     def write_h5(self, attribute):
-        """Write to hdf5 attribute and check mandatories are filled"""
-        mandatory_attrs = ("xmin xmax ymin ymax ref_point ref_vect n2_tau" 
-                           "generation_method").split()
-        for key, value in self.__dict__.iteritems():
-            if key in mandatory_attrs: assert value is not None
-            elif key not in self.ignored and value is not None:
-                if key == "transforms": value = json.dumps(value)
-                attribute[key] = value
+        """Check mandatories are filled and write to hdf5 attribute"""
+        for key, value in self.get_metas().iteritems():
+            if key in self.mandatory_vals + self.mandatory_vecs:
+                assert value is not None, "{} is mandatory for write".format(key)
+            attribute[key] = value
 
     def load(self, attribute):
         """Load self from hdf5 attribute"""
-        for key, value in attribute.iteritems():
-            if key in self.ignored: continue
-            else:
-                if "transforms" in key: value = json.loads(value)
-                setattr(self, key, value)
+        self.static.update(((key, attribute[key]) for key in attribute["static"]))
+        self.vects.update((
+                (key, getattr(geometry, self.vect_types[i])(attribute[k]))
+                for i,k in enumerate(attribute["vects"])))
 
-    def apply_trans(self):
-        """Apply all transformations to all points and vectors"""
-        pt_min = [self.xmin, self.ymin]
-        pt_max = [self.xmax, self.ymax]
-        if self.ndim == 3:
-            pt_min += [self.zmin]
-            pt_max += [self.zmax]
-        points = [pt_min, pt_max]
-        if self.ref_point is not None: points += [self.ref_point]
-        if self.geom_ref_point is not None: points += [self.geom_ref_point]
-        pt_update = [Vector(self.ndim, *arr[:]) for arr in points]
-        vectors = []
-        if self.ref_vect is not None: vectors.append(self.ref_vect)
-        if self.geom_ref_vect is not None: vectors.append(self.geom_ref_vect)
-        vec_update = [Vector(self.ndim, *arr[:]) for arr in vectors]
-
-        for trans, args in self.transforms:
-            if trans == "tr":
-                [p.translate(args) for p in pt_update]
-            elif trans == "sc":
-                [p.scale(args) for p in pt_update]
-            elif trans == "ro":
-                [p.rotate(*args) for p in pt_update]
-                [p.rotate(*args) for p in vec_update]
-            elif trans == "mi":
-                axis_dict = {'x':1, 'y':2, 'z':3}
-                [p.mirror(args) for p in pt_update]
-                [p.mirror(args) for p in vec_update]
-
-        if self.ndim == 2:
-            self.tr_xmin, self.tr_ymin = pt_update[0].vect
-            self.tr_xmax, self.tr_ymax = pt_update[1].vect
-        else:
-            self.tr_xmin, self.tr_ymin, self.tr_zmin = pt_update[0].vect
-            self.tr_xmax, self.tr_ymax, self.tr_zmax = pt_update[1].vect
-        if self.ref_point is not None:
-            self.tr_ref_point = pt_update[2].vect
-        if self.geom_ref_point is not None:
-            self.tr_geom_ref_point = pt_update[3].vect
-        if self.ref_vect is not None:
-            self.tr_ref_vect = vec_update[0].vect
-        if self.geom_ref_vect is not None:
-            self.tr_geom_ref_vect = vec_update[1].vect
+    def get_metas(self):
+        """Get all the meta data for the flame"""
+        out = self.static.copy()
+        out.update({
+            vect: self.vects[vect]() if self.vects[vect] is not None else None
+            for vect in self.vects.keys()})
+        out["static"] = self.static.keys()
+        out["vects"] = self.vects.keys()
+        out["vect_types"] = [v.__class__.__name__ for k,v in self.vects.items()]
+        return out
 
     def write_json(self, filehandle):
-        """Dump all metas as JSON file
+        """Dump all static as JSON file
         
-        Twist: all numpy arrays must be converted to list before JSON dump
-        A `numpies` field is added to know who was a numpy before dump (for
+        Twist: all numpy arrays must be converted to lists before JSON dump
+        The `numpies` field is used to know who was a numpy before dump (for
         reconstruction).
         """
         import json
-        numpies = []
-        out = {}
-        for k, v in self.__dict__.iteritems():
+        out = self.get_metas()
+        out['numpies'] = out["vects"][:]
+        for k, v in out.iteritems():
             try:
                 out[k] = v.tolist()
-                numpies.append(k)
+                out['numpies'].append(k)
             except AttributeError:
-                out[k] = v
-        out['numpies'] = numpies 
+                pass
         json.dump(out, filehandle, indent=4, separators=(',', ': '))
+
+    def transform(self, method, *args):
+        """Apply transformation to metas"""
+        [getattr(v, method)(*args) if v is not None else None
+         for v in self.vects.values()]

@@ -17,6 +17,7 @@ from textwrap import dedent
 from StringIO import StringIO
 
 from activeflame import ActiveFlame
+from geometry import NormalVector, Vector, Point
 
 logger = logging.getLogger()
 logger.setLevel("DEBUG")
@@ -123,14 +124,15 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             self.stdout.write('*** Unknown syntax: %s\n'%line)
             return
         elif len(func) > 1:
-            self.stdout.write('*** {} is a shorcut to several commands'.format(cmd))
-            self.stdout.write('    Please give more charaters for disambiguation')
+            print '*** {} is a shorcut to several commands'.format(cmd)
+            print '    Please give more charaters for disambiguation'
             return
         else:
             func[0](arg)
 
     def do_help(self, arg):
         """Wrapper for cmd.Cmd.do_help to accept shortcuts"""
+        print self.stdin
         if arg:
             helper = [n[5:] for n in self.get_names() if n.startswith('help_' + arg)]
             if len(helper) == 0:
@@ -154,41 +156,43 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         if len(args) != 2:
             print "*** invalid number of arguments"
             return
-        if args[1].lower()[:2] == "di":
+        typ, name = args
+        typ = typ[0].lower()
+        if typ == "d": # disc
             center = input_floats(raw_input('Circle center (x y) : '))
             radius = input_floats(raw_input('Circle radius (r)   : '))[0]
-            self.cur_fl = ActiveFlame(args[0], self.hip_exec)
+            self.cur_fl = ActiveFlame(name, self.hip_exec)
             self.cur_fl.define_flame_disc(center, radius)
-        elif args[1].lower()[:2] == "pa":
+        elif typ == "p": # parallelogram
             dim = int(raw_input('Number of dimensions (2 or 3) : '))
             if dim == 2:
                 xref = input_floats(raw_input('Corner point  (x y) : '))
                 vec1 = input_floats(raw_input('Side vector 1 (x y) : '))
                 vec2 = input_floats(raw_input('Side vector 2 (x y) : '))
-                self.cur_fl = ActiveFlame(args[0], self.hip_exec)
+                self.cur_fl = ActiveFlame(name, self.hip_exec)
                 self.cur_fl.define_flame_parallelogram(xref, vec1, vec2)
             elif dim == 3:
                 xref = input_floats(raw_input('Corner point  (x y z) : '))
                 vec1 = input_floats(raw_input('Side vector 1 (x y z) : '))
                 vec2 = input_floats(raw_input('Side vector 2 (x y z) : '))
                 vec3 = input_floats(raw_input('Side vector 3 (x y z) : '))
-                self.cur_fl = ActiveFlame(args[0], self.hip_exec)
+                self.cur_fl = ActiveFlame(name, self.hip_exec)
                 self.cur_fl.define_flame_parallelepiped(xref, vec1, vec2, vec3)
             else:
                 print "*** nope, it's either 2 or 3"
                 return
-        elif args[1].lower()[:2] == "sp":
+        elif typ == "s": # sphere
             center = input_floats(raw_input('Sphere center (x y z) : '))
             radius = input_floats(raw_input('Sphere radius (r)     : '))
-            self.cur_fl = ActiveFlame(args[0], self.hip_exec)
+            self.cur_fl = ActiveFlame(name, self.hip_exec)
             self.cur_fl.define_flame_sphere(center, radius)
-        elif args[1].lower()[:2] == "cy":
+        elif typ == "c": # cylinder
             center = input_floats(raw_input('Cylinder center (x y z) : '))
             radius = input_floats(raw_input('Cylinder radius (r)     : '))
             vector = input_floats(raw_input('Cylinder vector (x y z) : '))
-            self.cur_fl = ActiveFlame(args[0], self.hip_exec)
+            self.cur_fl = ActiveFlame(name, self.hip_exec)
             self.cur_fl.define_flame_cylinder(center, radius, vector)
-        elif args[1].lower()[:2] == "av":
+        elif typ == "a": # avbp field
             avbp_mesh = raw_input('AVBP mesh : ')
             if not isfile(avbp_mesh):
                 print "*** not such file"
@@ -199,7 +203,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 return
             avbp_field = raw_input('Scalar field : ')
             avbp_thresh = raw_input('Threshold value : ')
-            self.cur_fl = ActiveFlame(args[0], self.hip_exec)
+            self.cur_fl = ActiveFlame(name, self.hip_exec)
             self.cur_fl.define_threshold_flame(
                     avbp_mesh, avbp_sol, avbp_field, avbp_thresh)
         else:
@@ -212,19 +216,20 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
     def help_generate(self):
         print dedent("""\
                 Generate an analytical flame shape. All lenths are in [m]
-                > ge(nerate) <name> <shape>
-                |  <name>  : careful, same name flame is overwritten
-                |  <shape> : one of """ + ", ".join(self.generators))
+                > ge(nerate) <shape> <name> 
+                |  <shape> : one of {}
+                |  <name>  : careful, same name flame is overwritten""".format(
+                  ", ".join(self.generators)))
 
     def complete_generate(self, text, line, begidx, endidx):
-        return [ f for f in self.exports if f.startswith(text) ]
+        return [ f for f in self.generators if f.startswith(text) ]
 
     writers = "mesh flame full ntau all".split()
     def do_write(self, s):
         if self.cur_fl is None:
             print "*** no flames defined yet"
             return
-        if self.cur_fl.metas.ref_point is None:
+        if self.cur_fl.metas.pt_ref is None:
             print "*** please set reference point and vector before writing"
             return
         if s[:2] == "me": # me(sh)
@@ -259,7 +264,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 |  all   : write all of the above""")
 
     def complete_write(self, text, line, begidx, endidx):
-        return [ f for f in self.exports if f.startswith(text) ]
+        return [ f for f in self.writers if f.startswith(text) ]
 
     listers = "flames refs metas json dump".split()
     def do_list(self, s):
@@ -270,20 +275,24 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         if out == sys.stdout: print
         if s[:2] == "fl": # fl(ames)
             width = max([len(f.metas.name) for f in self.flames])
-            out.write("Cu   Name" + " "*width + "ndim  Volume\n")
-            out.write("-" * (21 + width) + "\n")
+            out.write("Cu   Name" + " "*width + "ndim  Volume     PtRef           VecRef\n")
+            out.write("-" * (48 + width) + "\n")
             for i, f in enumerate(self.flames) :
                 star = "*" if f == self.cur_fl else " "
-                out.write("{0} {1:2} {2:{width}}    {3}   {4}\n".format(
-                    star, i+1, f.metas.name, f.metas.ndim, f.shape.volume, width=width+2))
+                out.write("{0} {1:2} {2:{width}}    {3}   {4:.2E}   {5: <15} {6}\n".format(
+                    star, i+1, f.metas.name, f.metas.ndim, f.shape.volume,
+                    f.metas.pt_ref, f.metas.vec_ref, width=width+2))
         elif s[:2] == "re": # re(fs)
-            out.write("Reference point  : {}\n".format(self.cur_fl.metas.ref_point))
-            out.write("Reference vector : {}\n".format(self.cur_fl.metas.ref_vect))
+            out.write("Reference point  : {}\n".format(self.cur_fl.metas.pt_ref))
+            out.write("Reference vector : {}\n".format(self.cur_fl.metas.vec_ref))
         elif s[:2] == "me": # me(tas):
             out.write(" Key                  | Value\n")
             out.write(" -------------------------------------------\n")
-            for k, v in sorted(self.cur_fl.metas.__dict__.items()):
+            for k, v in sorted(self.cur_fl.metas.static.items()):
                 out.write(" {0:20} | {1}".format(k, v).replace('\n', ' ') + '\n')
+            for k, v in sorted(self.cur_fl.metas.vects.items()):
+                out.write(" {0:20} | {1}".format(
+                    k, v() if v is not None else None).replace('\n', ' ') + '\n')
         elif s[:2] == "js": # js(on formatted output):
             try:
                 with open("flame_{}.metas.json".format(
@@ -323,7 +332,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 |   <key>    : input a key, get the resulting meta value in a '<key>' file""")
 
     def complete_list(self, text, line, begidx, endidx):
-        return [ f for f in self.exports if f.startswith(text) ]
+        return [ f for f in self.listers if f.startswith(text) ]
 
     setters = "current meta refs ntau".split()
     def do_set(self, s):
@@ -334,7 +343,8 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         if self.cur_fl is None:
             print "*** no flames defined yet"
             return
-        if s[:2] == "cu": # cu(rrent)
+        switch = s[0].lower()
+        if switch == "c": # current
             cur = raw_input('Set current flame to : ')
             try:
                 nb = int(cur)
@@ -351,31 +361,35 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                         return
                 print "*** no such flame declared"
                 return
-        if s[:2] == "me": # me(ta)
-            meta = raw_input('Name of meta field to modify : ')
-            if not hasattr(self.cur_fl.metas, meta):
-                print "*** unknown meta"
-                return
-            typ = raw_input('Type of the field : ')[:2].lower()
-            val = raw_input('Value             : ')
-            if typ in ['', 'st']:
-                self.cur_fl.update_metas(**{meta: val})
-            elif typ == 'in':
-                self.cur_fl.update_metas(**{meta: int(val)})
-            elif typ == 'fl':
-                self.cur_fl.update_metas(**{meta: float(val)})
-            elif typ == 'ar':
-                self.cur_fl.update_metas(
-                        **{meta: np.array([float(v) for v in val.split()])})
-            else:
+        elif switch == "s": # static meta
+            meta = raw_input('Name of meta field to set : ')
+            typ = raw_input('Type of the field : ')[0].lower()
+            typ_dict = {'i': int,
+                        'f': float,
+                        'a': input_floats,
+                        's': lambda s: s,} # there is no 'identity' func in python!
+            if typ not in typ_dict.keys():
                 print "*** unknown type " + typ
                 return
-        elif s[:2] == "re": # "re(fs)"
+            val = typ_dict[typ](raw_input('Value             : '))
+            setattr(self.cur_fl.metas, meta, val)
+        elif switch == "v": #vector meta
+            meta = raw_input('Name of meta field to set : ')
+            typ = raw_input('Type of the field : ')[0].lower()
+            typ_dict = {'n': NormalVector,
+                        'v': Vector,
+                        'p': Point,}
+            if typ not in typ_dict.keys():
+                print "*** unknown type " + typ
+                return
+            self.cur_fl.metas.set_vect(
+                    meta,
+                    typ_dict[typ](input_floats(raw_input('Value             : '))))
+        elif switch == "r": # refs
             metas = {}
-            metas["ref_point"] = input_floats(raw_input('Reference point  (x y z) : '))
-            metas["ref_vect"] = input_floats(raw_input('Reference vector (x y z) : '))
-            self.cur_fl.update_metas(**metas)
-        elif s[:2] == "nt":
+            self.cur_fl.metas.pt_ref = Point(input_floats(raw_input('Reference point  (x y z) : ')))
+            self.cur_fl.metas.vec_ref = Vector(input_floats(raw_input('Reference vector (x y z) : ')))
+        elif switch == "n": # ntau
             typ = raw_input("Type of N : ").lower()
             if typ not in "n1 n2 n3 crocco global adim".split():
                 print "*** unknown N type"
@@ -385,27 +399,34 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 with open(path, 'r') as f:
                     return StringIO(f.read().lower().replace('d', 'e'))
             freq, n, tau = np.loadtxt(exp_wrapper(path)).T
-            if typ[:2].lower() in "n1 c".split():
+            typ = typ[:2].lower()
+            if typ in "n1 cr".split():
                 area, p_mean, gamma = input_floats(raw_input("Area, Pmean, gamma : "))
                 self.cur_fl.set_n1_tau(freq, tau, n, area, p_mean, gamma)
-            elif typ[:2].lower() in "n2 g".split():
+            elif typ in "n2 gl".split():
                 self.cur_fl.set_n2_tau(freq, tau, n)
-            elif typ[:2].lower() in "n3 a".split():
+            elif typ in "n3 ad".split():
                 u_bar, q_bar = input_floats(raw_input("U_bar, Q_bar : "))
                 self.cur_fl.set_n3_tau(freq, tau, n, u_bar, q_bar)
+            else:
+                print "*** unknown N type"
+                return
         else:
             print "*** unknown settable"
 
     def help_set(self):
         print dedent("""\
                 Set a value or parameter for the current flame
-                > set current <ref>
+                > set current
                 |  Set current flame to <ref>
                 |  <ref> = either a flame name or number
                 |  See ft> list flames to view which is current
-                > set meta <type> <value(s)>
+                > set static
                 |  Set any meta parameter for the flame
-                |  <type> = int, float or array
+                |  types: string, int, float or array
+                > set vector
+                |  Set a point or vector meta parameter for the flame
+                |  types: normal_vector, vector, point
                 > set refs
                 |  Set the reference point and vector
                 > set ntau
@@ -414,7 +435,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 |  See ?N_tau for more""")
 
     def complete_set(self, text, line, begidx, endidx):
-        return [ f for f in self.exports if f.startswith(text) ]
+        return [ f for f in self.setters if f.startswith(text) ]
 
     def help_N_tau(self):
         print dedent("""
@@ -508,59 +529,31 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 |  <name_src>  : name or number of flame to copy
                 |  <name_dest> : name of destination flame""")
 
-    transforms = "add list delete".split()
+    transforms = "translate scale rotate".split()
     def do_transform(self, s):
         """Appy transformation to current flame"""
         if self.cur_fl is None:
             print "*** no flames defined yet"
             return
-        if s[:2] == "ad": # ad(d)
-            trans = raw_input('Transformation type : ')[:2]
-            if trans == "tr":
-                vect = [float(f) for f in raw_input('Translation vector : ').split()]
-                self.cur_fl.add_transform(trans, vect)
-            elif trans == "sc":
-                vect = [float(f) for f in raw_input('Scale vector : ').split()]
-                self.cur_fl.add_transform(trans, vect)
-            elif trans == "ro":
-                axis = raw_input("Rotation axis : ")
-                angle = raw_input("Rotation angle (degrees) : ")
-                self.cur_fl.add_transform(trans, (axis, float(angle)))
-            elif trans == "mi":
-                axis = raw_input("Mirror axis : ")
-                self.cur_fl.add_transform(trans, axis)
-            else:
-                print "*** Accepted transforms : tr sc ro mi"
-                return
-        elif s[:2] == "li": # li(st)
-            width = max([len(f.metas.name) for f in self.flames])
-            print "\nNb Name" + " "*width + "Transformation Args"
-            print "-" * (26 + width)
-            for i, fla in enumerate(self.flames):
-                print "{0:2} {1:{width}}".format(i+1, fla.metas.name,
-                                                   width=width+2)
-                for trans, args in fla.metas.transforms:
-                    trans_dict = {'tr': "translation", 'sc': "scale",
-                                  'ro': "rotate", 'mi': "mirror"}
-                    print "   " + " "*width + "    {0:11}  {1}".format(
-                        trans_dict[trans], repr(args))
-        elif s[:2] == "de": # de(lete)
-            nb = s.split()[-1] if len(s.split()) > 1 else None
-            self.cur_fl.delete_transform(nb)
+        switch = s[0].lower()
+        if switch == "t":
+            vect = input_floats(raw_input('Translation vector : '))
+            self.cur_fl.transform(switch, vect)
+        elif switch == "s":
+            vect = input_floats(raw_input('Scale vector : '))
+            self.cur_fl.transform(switch, vect)
+        elif switch == "r":
+            axis = raw_input("Rotation axis : ")
+            angle = raw_input("Rotation angle (degrees) : ")
+            self.cur_fl.transform(switch, (axis, float(angle)))
         else:
-            print "*** unknown transform command"
+            print "*** Accepted transforms : " + " ".join(self.transforms)
+            return
 
     def help_transform(self):
         print dedent("""\
                 Apply transformation to current flame
-                > tr(ansform) ad(d)
-                |  Add a transformation to the flame
-                |  Known transformations: tr(anslate)|sc(ale)|ro(tate)|mi(rror)
-                > tr(ansform) li(st)
-                |  List all transformation applied to flame
-                > tr(ansform) de(lete) [<nb>]
-                |  Delete a transformation from list
-                |  [<nb>] : delete transformation <nb>. If omitted, delete all""")
+                > transform translate|scale|rotate""")
 
     def complete_transform(self, text, line, begidx, endidx):
         return [ f for f in self.transforms if f.startswith(text) ]
@@ -589,7 +582,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        print "*** to execute a script, please feed as input:"
+        print "*** to execute a script, please feed to stdin:"
         print "    $ flametransfer.py < " + sys.argv[1]
         sys.exit()
     interpreter = FlameTransferCmd()
