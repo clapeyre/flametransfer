@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+"""
+process_modify.py
+
+Process 'Modify' tab for FlameTransfer app
+
+Created December 2016 by C. Lapeyre (lapeyre@cerfacs.fr)
+"""
+
+import numpy as np
+
+from os.path import isfile, basename
+
+from XDR2 import XDRException, XDRUnknownValue
+from flametransferprocess import FlameTransferProcess
+#from activeflame import ActiveFlame
+from process_library import process_library
+
+def process_modify(pr):
+    """Modify existing or new virgin flame"""
+    ds = pr.ds
+
+    label = ds.getValue("cho_write_to_flame")
+    put_files = []
+    flame_geo = ds.getValue("xor_flame_geo", "modify")
+    #flame.update_metas(generation_type=flame_geo)
+    if flame_geo == "analytical2D_circle":
+        center = [float(f) for f in ds.getListValue("ana_flame_center", "modify")[1::2]]
+        radius = float(ds.getValue("ana_flame_radius", "modify"))
+        #flame.define_flame_circle(*[np.array(arr) for arr in [center, radius]])
+        script = ["ge {0} {1}".format(label, "ci"),
+                  "{0[0]} {0[1]}".format(center),
+                  "{}".format(radius)]
+    elif flame_geo == "analytical2D_parallelogram":
+        center = [float(f) for f in ds.getListValue("ana_flame_center", "modify")[1::2]]
+        vector1 = [float(f) for f in ds.getListValue("ana_flame_vector1", "modify")[1::2]]
+        vector2 = [float(f) for f in ds.getListValue("ana_flame_vector2", "modify")[1::2]]
+        #flame.define_flame_parallelogram(*[np.array(arr) for arr in [center, vector1, vector2]])
+        script = ["ge {0} {1}".format(label, "pa"),
+                  "{0[0]} {0[1]}".format(center),
+                  "{0[0]} {0[1]}".format(vector1),
+                  "{0[0]} {0[1]}".format(vector2)]
+    elif flame_geo == "analytical3D_sphere":
+        center = [float(f) for f in ds.getListValue("ana_flame_center", "modify")[1::2]]
+        radius = float(ds.getValue("ana_flame_radius", "modify"))
+        #flame.define_flame_sphere(*[np.array(arr) for arr in [center, radius]])
+        script = ["ge {0} {1}".format(label, "sp"),
+                  "{0[0]} {0[1]} {0[2]}".format(center),
+                  "{}".format(radius)]
+    elif flame_geo == "analytical3D_cylinder":
+        center = [float(f) for f in ds.getListValue("ana_flame_center", "modify")[1::2]]
+        radius = float(ds.getValue("ana_flame_radius", "modify"))
+        vector = [float(f) for f in ds.getListValue("ana_flame_vector", "modify")[1::2]]
+        pr.log.debug("Creating cylinder with center " + repr(center))
+        pr.log.debug("                       radius " + repr(radius))
+        pr.log.debug("                       vector " + repr(vector))
+        #flame.define_flame_cylinder(*[np.array(arr) for arr in [center, radius, vector]])
+        script = ["ge {0} {1}".format(label, "cy"),
+                  "{0[0]} {0[1]} {0[2]}".format(center),
+                  "{}".format(radius),
+                  "{0[0]} {0[1]} {0[2]}".format(vector)]
+    elif flame_geo in ["avbp_scalar_threshold_3D", "avbp_scalar_threshold_2D"]:
+        avbp_sol = ds.getValue("avbp_sol", "xor_flame_geo", "modify")
+        avbp_mesh = ds.getValue("avbp_mesh", "xor_flame_geo", "modify")
+        scal = ds.getValue("scal", "xor_flame_geo", "modify")
+        thresh = ds.getValue("thresh", "xor_flame_geo", "modify")
+        script = ["ge {0} {1}".format(label, "av"),
+                  basename(avbp_mesh),
+                  basename(avbp_sol),
+                  scal,
+                  thresh]
+        put_files += [avbp_sol, avbp_mesh]
+    else:
+        raise XDRUnknownValue(
+          "xor_flame_geo", flame_geo,
+          "analytical2D_circle analytical2D_parallelogram analytical3D_sphere"
+          " analytical3D_cylinder scal_and_thresh")
+
+    n_tau_type = ds.getValue("xor_n_and_tau", "modify")
+    if n_tau_type == "single_values":
+        d = ds.getListDict("values", "xor_n_and_tau")
+        n_tau_path = "tmp.dat"
+        with open(n_tau_path, 'w') as f:
+            f.write("{0} {1} {2}".format(
+                d["Frequency"], d["N"], d["tau"]))
+    else:
+        n_tau_path = ds.getValue("n_tau_data_path")
+
+    n_type = ds.getValue("xor_n_type", "modify")
+    if n_type == "global":
+        script += ["se nt", n_type, basename(n_tau_path)]
+    elif n_type == "crocco":
+        area = ds.getValue("area", "xor_n_type", "modify")
+        p_mean = ds.getValue("p_mean", "xor_n_type", "modify")
+        gamma = ds.getValue("gamma", "xor_n_type", "modify")
+        script += ["se nt", n_type, basename(n_tau_path), "{0} {1} {2}".format(area, p_mean, gamma)]
+    elif n_type == "adim":
+        q_bar = ds.getValue("q_bar", "xor_n_type", "modify")
+        u_bar = ds.getValue("u_bar", "xor_n_type", "modify")
+        script += ["se nt", n_type, basename(n_tau_path), q_bar + " " + u_bar]
+    script += ["se re",
+               " ".join(ds.getListValue("ptref_list", "modify")[1::2]),
+               " ".join(ds.getListValue("vecref_list", "modify")[1::2])]
+    put_files += [n_tau_path]
+
+    script += ["wr fu"]
+    script += ["wr nt"]  # Just for debug
+    script += ["qu\n"]
+
+    pr.execute_script("-create_flame-",
+                      "\n".join(script), put_files=put_files, 
+                      get_files=[pr.flame_file(label)])
+
+def update_flame_params(pr):
+    """Update the 'modify' tab with values from a selected existing flame"""
+    ds = pr.ds
+    selected_flame = ds.getValue("cho_update_flame_params")
+    metas = pr.get_metas(paths=[pr.flame_file(selected_flame)])[selected_flame]
+    sh_args = metas["shape_params"].split()
+    ds.removeNode("xor_ndim")
+    ndim = "three_d" if "3D" in metas["generation_method"] else "two_d"
+    ds.addChild("xor_ndim", ndim, "modify")
+    ds.addChild(ndim, "", "xor_ndim")
+    ds.addChild("pt_ref", "", ndim)
+    ds.addChild("ptref_list", to_ds_list('x y z'.split(), metas["ref_point"].split()), "pt_ref")
+    ds.addChild("vecref_list", to_ds_list('x y z'.split(), metas["ref_vect"].split()), "pt_ref")
+    ds.addChild("xor_flame_geo", metas["generation_method"], ndim)
+    ds.addChild(metas["generation_method"], "", "xor_flame_geo")
+    if metas["generation_method"] == "analytical2D_parallelogram":
+        ds.addChild("ana_flame_center", to_ds_list('x y'.split(), sh_args[0:2]), metas["generation_method"])
+        ds.addChild("ana_flame_vector1", to_ds_list('u1_x u1_y'.split(), sh_args[2:4]), metas["generation_method"])
+        ds.addChild("ana_flame_vector2", to_ds_list('u2_x u2_y'.split(), sh_args[4:]), metas["generation_method"])
+    elif metas["generation_method"] == "analytical2D_circle":
+        ds.addChild("ana_flame_center", to_ds_list('x y'.split(), sh_args[0:2]), metas["generation_method"])
+        ds.addChild("ana_flame_radius", str(sh_args[2]), metas["generation_method"])
+    elif metas["generation_method"] == "analytical3D_sphere":
+        ds.addChild("ana_flame_center", to_ds_list('x y z'.split(), sh_args[0:3]), metas["generation_method"])
+        ds.addChild("ana_flame_radius", str(sh_args[3]), metas["generation_method"])
+    elif metas["generation_method"] == "analytical3D_cylinder":
+        ds.addChild("ana_flame_center", to_ds_list('x y z'.split(), sh_args[0:3]), metas["generation_method"])
+        ds.addChild("ana_flame_radius", str(sh_args[3]), metas["generation_method"])
+        ds.addChild("ana_flame_vector", to_ds_list('u_x u_y u_z'.split(), sh_args[4:]), metas["generation_method"])
+    else:
+        pr.log.error("Unknown generation method {}. Cannot set default values in 'modify' tab".format(metas["generation_method"]))
+        raise ValueError
+
+def to_ds_list(keys, values):
+    out = []
+    for k, v in zip(keys, values):
+        out.extend([str(k), str(v)])
+    return ";".join(out)
+
+if __name__ == '__main__':
+    import sys
+    pr = FlameTransferProcess('dataset.xml')
+    if "update" in sys.argv:
+        update_flame_params(pr)
+    else:
+        process_modify(pr)
+        pr.update_flames()
+    pr.finish()
+
