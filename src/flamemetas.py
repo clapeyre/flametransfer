@@ -2,7 +2,7 @@
 """
 FlameMetas class to handle all meta information pertaining to an active flame.
 
-Created January 2017 by COOP team
+Created January 2017 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
 
 import json
@@ -11,9 +11,7 @@ from collections import OrderedDict
 from numpy import array as nparray
 
 import geometry
-
-GRID_SIZE = 32
-VERSION = "17.01"
+from constants import VERSION
 
 class FlameMetas(object):
     """Meta data associated to a flame"""

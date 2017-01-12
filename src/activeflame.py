@@ -3,7 +3,7 @@
 ActiveFlame class to handle all information pertaining to an active flame.
 Handle Read / Write of H5 Flame files.
 
-Created November 2016 by COOP team
+Created November 2016 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
 
 import os
@@ -25,7 +25,8 @@ from tempfile import TemporaryFile
 from geometry import (Parallelepiped, Sphere, Cylinder, Parallelogram, Disc,
                       ScatterShape2D, ScatterShape3D, NormalVector, Vector,
                       Point,)
-from flamemetas import FlameMetas, VERSION
+from flamemetas import FlameMetas
+from constants import VERSION
 
 class ActiveFlame(object):
     """Flame holder class associated to a flame hdf5 file"""

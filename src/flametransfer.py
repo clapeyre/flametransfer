@@ -2,7 +2,7 @@
 """
 FlameTransfer main command line utility
 
-Created December 2016 by COOP team
+Created December 2016 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
 
 import os
@@ -18,6 +18,7 @@ from StringIO import StringIO
 
 from activeflame import ActiveFlame
 from geometry import NormalVector, Vector, Point
+from constants import VERSION
 
 logger = logging.getLogger()
 logger.setLevel("DEBUG")
@@ -77,9 +78,9 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         sys.exit()
 
     intro = dedent("""\
-            Welcome to the FlameTransfer command line
+            Welcome to the FlameTransfer V.{} command line
             Type help or ? for a list of commands,
-                 ?about for more on this app""")
+                 ?about for more on this app""").format(VERSION)
 
     prompt = "ft > "
     flames = []
@@ -582,7 +583,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         print "*** to execute a script, please feed to stdin:"
-        print "    $ flametransfer.py < " + sys.argv[1]
+        print "    $ flametransfer < " + sys.argv[1]
         sys.exit()
     interpreter = FlameTransferCmd()
     interpreter.cmdloop()
