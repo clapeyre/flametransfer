@@ -132,7 +132,6 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
 
     def do_help(self, arg):
         """Wrapper for cmd.Cmd.do_help to accept shortcuts"""
-        print self.stdin
         if arg:
             helper = [n[5:] for n in self.get_names() if n.startswith('help_' + arg)]
             if len(helper) == 0:
