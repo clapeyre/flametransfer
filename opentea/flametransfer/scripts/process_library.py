@@ -19,21 +19,21 @@ def process_library(pr):
         pass # This is done on process initialization
     if action == "create_new_flame":
         name = ds.getValue("input_flame_name", "xor_lib_action")
-        pr.add_flame(name)
+        pr.add_libobj(name)
     if action == "import_flame":
         path = ds.getValue("inputfile_import_flame", "xor_lib_action")
-        pr.import_flame(path)
+        pr.import_libobj(path)
     if action == "duplicate_flame":
         name = ds.getValue("cho_flame", "xor_lib_action")
-        pr.duplicate_flame(name)
+        pr.duplicate_libobj(name)
     if action == "rename_flame":
         src = ds.getValue("cho_flame", "xor_lib_action")
         dest = ds.getValue("input_flame_name", "xor_lib_action")
-        pr.rename_flame(src, dest)
+        pr.rename_libobj(src, dest)
     if action == "delete_flame":
         name = ds.getValue("cho_flame", "xor_lib_action")
-        pr.del_flame(name)
-    pr.update_flames()
+        pr.del_libobj(name)
+    pr.update_libobjs()
 
 if __name__ == '__main__':
     pr = FlameTransferProcess('dataset.xml')

@@ -2,12 +2,12 @@
     <param name="flag_update_flame" title="Read from existing flame" type="onoff" default="0"/>
 </model>
 <model name="update_flame_params" title="Read parameters from existing flame" layout="flat" existif="#flag_update_flame#=={1}">
-    <choice name="cho_update_flame_params" title="Choose a flame" require="list_written_flames" />
+    <choice name="cho_update_flame_params" title="Choose a flame" require="list_written_libobjs" />
     <action name="act_update" title="Update" script="process_modify.py" script_args="update"/>
 </model>
 
 <model name="write_to_flame" title="Write to flame">
-    <choice name="cho_write_to_flame" title="Choose a flame" require="list_flames_in_project" />
+    <choice name="cho_write_to_flame" title="Choose a flame" require="list_libobjs_in_project" />
     <desc>
         WARNING: you are overwriting this flame. Choose wisely!
     </desc>
@@ -15,19 +15,18 @@
 
 <model name="n_tau" title="N-tau model parameters">
     <xor name="xor_n_and_tau" title="Frequency [Hz] and N" default="single_values" >
-        <model name="single_values" title="Single values">
+        <model name="single_values" title="Single frequency">
             <param name="values" title="n-tau model values" type="list_double" default="Frequency;100.;N;1.;tau;0.001" fixed="" />
         </model>
-        <model name="from_file" title="Read file">
+        <model name="from_file" title="Read column file">
             <param name="n_tau_data_path" title="Path to column data file" type="file" default="" />
+            <docu>
+                Column file where # is the comment symbol, tabs and/or spaces as separators.
+                Expected columns: (freq [Hz]) (N* [*]) (tau [s])
+                For values of N, see "Type of Index" explanation
+            </docu>
         </model>
     </xor>
-    <docu>
-        Dimensional values of flame transfer function gain and delay.
-        [section='N2':] Gain of Flame Transfer Function in J/m (see table).
-        [section='tau':] Delay of Flame Transfer Function in s
-        [image=ntau_conventions.gif; caption=Conventions for N.]
-    </docu>
     <xor name="xor_n_type" title="Type of index" default="global" groups="on">
         <model name="crocco" title="Crocco">
             <param name="area" title="Reference surface [m^2]" type="double" default="0.001" />
@@ -41,13 +40,19 @@
             <param name="q_bar" title="HR mean" type="double" default="1" />
         </model>
     </xor>
+    <docu>
+        Dimensional values of flame transfer function gain and delay.
+        [section='N':] Gain of Flame Transfer Function (see table).
+        [section='tau':] Delay of Flame Transfer Function in s
+        [image=ntau_conventions.gif; caption=Conventions for N.]
+    </docu>
 </model>
 
 <xor name="xor_ndim" title="" default="three_d">
     <model name="three_d" title="3D configuration">
         <model name="ptref" title="Active flame references">
-           <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0;z;0.0"/>
-           <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0;z;0.0" />
+           <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed=""/>
+           <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed=""/>
         </model>
         <xor name="xor_flame_geo" title="Flame geometry" default="analytical3D_cylinder" groups="on">
             <model name="analytical3D_cylinder" title="Cylinder">
@@ -103,8 +108,8 @@
     </model>
     <model name="two_d" title="2D Configuration">
         <model name="ptref" title="Active flame references">
-           <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0"/>
-           <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0" />
+           <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0" fixed=""/>
+           <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0" fixed=""/>
         </model>
         <xor name="xor_flame_geo" title="Flame geometry" default="analytical2D_parallelogram" groups="on">
             <model name="analytical2D_parallelogram" title="Parallelogram">
@@ -121,13 +126,13 @@
                 <param name="ana_flame_vector1" title="First parallelogram side [m]" type="list_double" default="u1_x;0.0;u1_y;0.0" fixed="" />
                 <param name="ana_flame_vector2" title="Second parallelogram side [m]" type="list_double" default="u2_x;0.0;u2_y;0.0" fixed="" />
             </model>
-            <model name="analytical2D_circle" title="Circle">
+            <model name="analytical2D_disc" title="Disc">
                 <docu>
                     Locate where the flame (i.e. specified N and Tau values) is
                     imposed in the AVSP initial solution. The flame is assumed
                     compact and located in a cartesian volume.
-                    [section='x, y' :] Coordinates of the center of the circle
-                    [section='radius' :] Radius of the circle
+                    [section='x, y' :] Coordinates of the center of the disc
+                    [section='radius' :] Radius of the disc
                     <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
                 </docu>
                 <param name="ana_flame_center" title="Sphere center [m]" type="list_double" default="x;0.0;y;0.0" fixed="" />

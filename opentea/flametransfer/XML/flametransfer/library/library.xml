@@ -9,17 +9,17 @@
         <param name="inputfile_import_flame" title="File" type="file" filter="h5" default=""/>
     </model>
     <model name="duplicate_flame" title="Duplicate flame">
-        <choice name="cho_flame" title="Flame to duplicate" require="list_written_flames" />
+        <choice name="cho_flame" title="Flame to duplicate" require="list_written_libobjs" />
         <desc>
             Note: only available for flames that have alredy been written to disk
         </desc>
     </model>
     <model name="rename_flame" title="Rename existing flame">
-        <choice name="cho_flame" title="Flame to rename" require="list_flames_in_project" />
+        <choice name="cho_flame" title="Flame to rename" require="list_libobjs_in_project" />
         <param name="input_flame_name" title="New name" type="string" default=""/>
     </model>
     <model name="delete_flame" title="Delete flame">
-        <choice name="cho_flame" title="Flame to delete" require="list_flames_in_project" />
+        <choice name="cho_flame" title="Flame to delete" require="list_libobjs_in_project" />
         <desc>
             WARNING : any associated .h5 file will be permanently deleted
         </desc>
@@ -27,12 +27,12 @@
 </xor>
 
 <model name="flame_library" title="Flame list" >
-    <multiple name="mul_flames" title="Flames" require="list_flames_in_project">
+    <multiple name="mul_libobjs" title="Flames" require="list_libobjs_in_project">
         <comment name="flame_details" title="Flame details" state="disabled" />
         <comment name="ftf_details" title="FTF details" state="disabled" />
         <info name="flag_h5_exists" type="onoff" default="0" visibility="hidden" />
     </multiple>   
 </model>
 
-<info name="list_flames_in_project" default="" visibility="hidden" />
-<info name="list_written_flames" default="" visibility="hidden" />
+<info name="list_libobjs_in_project" default="" visibility="hidden" />
+<info name="list_written_libobjs" default="" visibility="hidden" />
