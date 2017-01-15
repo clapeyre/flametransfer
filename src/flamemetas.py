@@ -11,7 +11,7 @@ from collections import OrderedDict
 from numpy import array as nparray
 
 import geometry
-from constants import VERSION
+from constants import VERSION, GRID_SIZE
 
 class FlameMetas(object):
     """Meta data associated to a flame"""
@@ -72,7 +72,7 @@ class FlameMetas(object):
         """Load self from hdf5 attribute"""
         self.static.update(((key, attribute[key]) for key in attribute["static"]))
         self.vects.update((
-                (key, getattr(geometry, self.vect_types[i])(attribute[k]))
+                (k, getattr(geometry, attribute["vect_types"][i])(attribute[k]))
                 for i,k in enumerate(attribute["vects"])))
 
     def get_metas(self):

@@ -6,9 +6,11 @@ TODO
 
 Created Nov 2016 by COOP team
 """
-import numpy as np
 import math
+import json
+from collections import OrderedDict
 from abc import abstractmethod
+import numpy as np
 
 def intersect(start1, end1, start2, end2):
     """Given 4 points, find intersection of 2 lines. Works in any dimension"""
@@ -22,9 +24,11 @@ class Vector(object):
     def __init__(self, vect):
         self.ndim = len(vect)
         self.vect = np.array(vect).reshape(-1, 1)
-        self.length = np.linalg.norm(self.vect)
 
     def __call__(self): return self.vect.reshape(-1)
+
+    @property
+    def length(self): return np.linalg.norm(self.vect)
 
     def rotate(self, axis, angle, degrees=True):
         if degrees: angle *= np.pi/180.
@@ -78,7 +82,7 @@ class Point(Vector):
 class Shape(object):
     def __init__(self, ndim):
         self.ndim = ndim
-        self.vects = {}
+        self.vects = OrderedDict()
 
     def rotate(self, axis, angle, degrees=True):
         [p.rotate(axis, angle, degrees) for p in self.vects.values()]
@@ -157,9 +161,12 @@ class Parallelogram(Shape2D):
     def bounding_box(self):
         """Set bounding box for shape"""
         xref = self.vects["xref"]()
-        top_pt = xref + self.vects["vec1"]() + self.vects["vec2"]()
-        self.vects["pt_min"] = Point([min(xref[0], top_pt[0]), min(xref[1], top_pt[1])])
-        self.vects["pt_max"] = Point([max(xref[0], top_pt[0]), max(xref[1], top_pt[1])])
+        pt_list = np.array([xref,
+                            xref + self.vects["vec1"](),
+                            xref + self.vects["vec2"](),
+                            xref + self.vects["vec1"]() + self.vects["vec2"]()])
+        self.vects["pt_min"] = Point([pt_list[:,0].min(), pt_list[:,1].min()])
+        self.vects["pt_max"] = Point([pt_list[:,0].max(), pt_list[:,1].max()])
 
     @property
     def area(self):
@@ -201,21 +208,24 @@ class Parallelepiped(Shape3D):
                                      self.vects["vec2"](),
                                      self.vects["vec3"](),))
 
-    def bounding_box(self):
-        """Set bounding box for shape"""
-        xref = self.vects["xref"]()
-        top_pt = xref + self.vects["vec1"]() + self.vects["vec2"]() + self.vects["vec3"]()
-        self.vects["pt_min"] = Point([min(xref[0], top_pt[0]),
-                                      min(xref[1], top_pt[1]),
-                                      min(xref[2], top_pt[2])])
-        self.vects["pt_max"] = Point([max(xref[0], top_pt[0]),
-                                      max(xref[1], top_pt[1]),
-                                      max(xref[2], top_pt[2])])
-
     @property
     def volume(self):
         """Get parallelogram volume"""
         return abs(np.linalg.det(self.mat))
+
+    def bounding_box(self):
+        """Set bounding box for shape"""
+        xref = self.vects["xref"]()
+        pt_list = np.array([xref,
+                            xref + self.vects["vec1"](),
+                            xref + self.vects["vec2"](),
+                            xref + self.vects["vec3"](),
+                            xref + self.vects["vec1"]() + self.vects["vec2"](),
+                            xref + self.vects["vec1"]() + self.vects["vec3"](),
+                            xref + self.vects["vec2"]() + self.vects["vec3"](),
+                            xref + self.vects["vec1"]() + self.vects["vec2"]() + self.vects["vec3"]()])
+        self.vects["pt_min"] = Point([pt_list[:,0].min(), pt_list[:,1].min(), pt_list[:,2].min()])
+        self.vects["pt_max"] = Point([pt_list[:,0].max(), pt_list[:,1].max(), pt_list[:,2].max()])
 
     def project(self, x):
         """Project vector x on basis formed by parallelepiped
@@ -235,6 +245,8 @@ class Parallelepiped(Shape3D):
     def is_inside(self, x):
         """Determine if x is inside the parallelepiped"""
         a, b, c = self.project(x)
+        print a.min(), a.max(), b.min(), b.max(), c.min(), c.max(),
+        print a[1000:1010], b[1000:1010], c[1000:1010]
         return (a <= 1 ) & (a >= 0) & (b <= 1) & (b >= 0) & (c <= 1) & (c >= 0)
 
 
@@ -242,14 +254,14 @@ class Disc(Shape2D):
     def __init__(self, center, radius):
         Shape2D.__init__(self)
         self.vects["center"] = Point(center)
-        self.radius = radius
+        self.radius = np.array(radius)
         self.check()
         self.bounding_box()
 
     def bounding_box(self):
         """Set bounding box for shape"""
-        self.vects["pt_min"] = self.vects["center"]() - self.radius
-        self.vects["pt_max"] = self.vects["center"]() + self.radius
+        self.vects["pt_min"] = Point(self.vects["center"]() - self.radius)
+        self.vects["pt_max"] = Point(self.vects["center"]() + self.radius)
 
     @property
     def area(self):
@@ -270,19 +282,19 @@ class Sphere(Shape3D):
     def __init__(self, center, radius):
         Shape3D.__init__(self)
         self.vects["center"] = Point(center)
-        self.radius = radius
+        self.radius = np.array(radius)
         self.check()
         self.bounding_box()
 
     def bounding_box(self):
         """Set bounding box for shape"""
-        self.vects["pt_min"] = self.vects["center"]() - self.radius
-        self.vects["pt_max"] = self.vects["center"]() + self.radius
+        self.vects["pt_min"] = Point(self.vects["center"]() - self.radius)
+        self.vects["pt_max"] = Point(self.vects["center"]() + self.radius)
 
     @property
     def volume(self):
         """Get sphere volume"""
-        return 4./3. * np.pi * self.radius**3
+        return (4./3. * np.pi * self.radius**3)[0]
 
     def distance(self, x):
         """Find distance to sphere center"""
@@ -298,7 +310,7 @@ class Cylinder(Shape3D):
         Shape3D.__init__(self)
         self.vects["xref"] = Point(center)
         self.vects["vec"] = Vector(vec)
-        self.radius = radius
+        self.radius = np.array(radius)
         self.check()
         self.bounding_box()
 
@@ -344,41 +356,14 @@ class Cylinder(Shape3D):
         axis, radius = self.project(x)
         return (axis >= 0.) & (axis <= 1.) & (radius <= 1.)
     
-    
-class rotation():
-    """ Quaternions are used to define a rotation on space around any axis
-    """
-    def __init__(self,origin,direction,theta):
-        """
-        origin,direction : 3D tuples defining a point and a direction
-        theta : angle of rotation in radians
-        """
-        self.origin = np.asarray(origin)
-        self.axis = np.asarray(direction)
-        self.theta = theta
-        # unit vect as axis
-        self.axis /= np.linalg.norm(self.axis)
-       
-    
-    def rotate(self,vect):
-        """ vect is a 3D tuple.
-        return the rotated vector
-        """
-        vect0 = np.asarray(vect)
-        outvect = np.dot(self._rotation_matrix(),vect0-self.origin)+self.origin
-        return outvect
-        
-        
-    def _rotation_matrix(self):
-        """
-        Return the rotation matrix associated with counterclockwise rotation about
-        the given axis by theta radians.
-        """
-        a = math.cos(self.theta / 2.0)
-        b, c, d = -self.axis * math.sin(self.theta / 2.0)
-        aa, bb, cc, dd = a * a, b * b, c * c, d * d
-        bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
-        return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
-                         [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
-                         [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+
+def shape2json(shape):
+    """Convert shape to json string"""
+    out = [shape.__class__.__name__,
+           [v().tolist() for v in shape.vects.values()]]
+    return json.dumps(out)
+
+def json2shape(json_string):
+    klass, args = json.loads(json_string)
+    return globals()[klass](*args)
 

@@ -28,8 +28,12 @@ file_handler.setFormatter(file_format)
 logger.addHandler(file_handler)
 
 def input_floats(inp):
+    """Convert raw input to float array"""
+    return [float(f) for f in inp.split()]
+
+def input_array(inp):
     """Convert raw input to numpy array"""
-    return np.array([float(f) for f in inp.split()])
+    return np.array(input_floats(inp))
 
 class ExitCmd(cmd.Cmd, object):
     def can_exit(self):
@@ -273,7 +277,8 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             return
         out = open(s.split()[-1], 'w') if (len(s.split()) > 1) else sys.stdout
         if out == sys.stdout: print
-        if s[:2] == "fl": # fl(ames)
+        arg = s[0].lower()
+        if arg == "f": # flames
             width = max([len(f.metas.name) for f in self.flames])
             out.write("Cu   Name" + " "*width + "ndim  Volume     PtRef           VecRef\n")
             out.write("-" * (48 + width) + "\n")
@@ -282,10 +287,10 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
                 out.write("{0} {1:2} {2:{width}}    {3}   {4:.2E}   {5: <15} {6}\n".format(
                     star, i+1, f.metas.name, f.metas.ndim, f.shape.volume,
                     f.metas.pt_ref, f.metas.vec_ref, width=width+2))
-        elif s[:2] == "re": # re(fs)
+        elif arg == "r": # refs
             out.write("Reference point  : {}\n".format(self.cur_fl.metas.pt_ref))
             out.write("Reference vector : {}\n".format(self.cur_fl.metas.vec_ref))
-        elif s[:2] == "me": # me(tas):
+        elif arg == "m": # metas
             out.write(" Key                  | Value\n")
             out.write(" -------------------------------------------\n")
             for k, v in sorted(self.cur_fl.metas.static.items()):
@@ -293,7 +298,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             for k, v in sorted(self.cur_fl.metas.vects.items()):
                 out.write(" {0:20} | {1}".format(
                     k, v() if v is not None else None).replace('\n', ' ') + '\n')
-        elif s[:2] == "js": # js(on formatted output):
+        elif arg == "j": # json formatted output
             try:
                 with open("flame_{}.metas.json".format(
                               self.cur_fl.metas.name),
@@ -302,7 +307,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             except ImportError:
                 print "*** could not import python module json"
                 return
-        elif s[:2] == "du": # du(mp)
+        elif arg == "d": # dump
             if out == sys.stdout:
                 print "*** <key> argument mandatory for dump"
                 return

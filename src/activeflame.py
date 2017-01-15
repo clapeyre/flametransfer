@@ -5,6 +5,7 @@ Handle Read / Write of H5 Flame files.
 
 Created November 2016 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
+DEBUG = False
 
 import os
 import sys
@@ -13,6 +14,7 @@ import logging
 import subprocess
 import commands
 import copy
+import json
 import numpy as np
 
 from os.path import join, isdir
@@ -24,7 +26,7 @@ from tempfile import TemporaryFile
 
 from geometry import (Parallelepiped, Sphere, Cylinder, Parallelogram, Disc,
                       ScatterShape2D, ScatterShape3D, NormalVector, Vector,
-                      Point,)
+                      Point, json2shape, shape2json)
 from flamemetas import FlameMetas
 from constants import VERSION
 
@@ -133,28 +135,19 @@ class ActiveFlame(object):
         y = mesh["Coordinates/y"].value
         x_in = x[above]
         y_in = y[above]
+        pt_min = [x_in.min(), y_in.min()]
+        pt_max = [x_in.max(), y_in.max()]
+        klass = ScatterShape2D
+        self.metas.generation_method = "avbp_scalar_threshold_2D"
         if 'z' in mesh["Coordinates"].keys():
+            self.metas.generation_method = "avbp_scalar_threshold_3D"
             z = mesh["Coordinates/z"].value
             z_in = z[above]
-            self.log.debug("Generating 3D flame from AVBP. Bounding box :")
-            self.log.debug(" ".join("{}".format(x) for x in [
-                x_in.min(), x_in.max(),
-                y_in.min(), y_in.max(),
-                z_in.min(), z_in.max()]))
-            self.shape = ScatterShape3D(
-                    x_in.min(), x_in.max(),
-                    y_in.min(), y_in.max(),
-                    z_in.min(), z_in.max())
-            self.metas.generation_method = "avbp_scalar_threshold_3D"
-        else:
-            self.shape = ScatterShape2D(
-                    x_in.min(), x_in.max(),
-                    y_in.min(), y_in.max())
-            self.log.debug("Generating 2D flame from AVBP. Bounding box :")
-            self.log.debug(" ".join("{}".format(x) for x in [
-                x_in.min(), x_in.max(),
-                y_in.min(), y_in.max()]))
-            self.metas.generation_method = "avbp_scalar_threshold_2D"
+            pt_min += [z_in.min()]
+            pt_max += [z_in.max()]
+            klass = ScatterShape3D
+        self.log.debug("Generating scattershape from AVBP")
+        self.shape = klass(pt_min, pt_max)
         self.make_mesh()
         with File("dummy_avbp.h5", 'w') as f:
             f.create_group
@@ -181,8 +174,7 @@ class ActiveFlame(object):
                 "qu",
                 ]
         self.exec_hip('\n'.join(script))
-        self.shape.inside_points = File(
-                "dummy_flame.sol.h5", 'r')['Additionals/n_tau_flag'].value
+        self._read_scatter_pts("dummy_flame.sol.h5")
         if not self.debug:
             os.remove("dummy_avbp.h5")
             os.remove("dummy_flametrans.h5")
@@ -190,25 +182,27 @@ class ActiveFlame(object):
             os.remove("dummy_flame.mesh.h5")
             os.remove("dummy_flame.asciiBound")
 
+    def _read_scatter_pts(self, path):
+        """Read scatter points from flame file"""
+        self.shape.inside_points = (
+                File(path, 'r')['Additionals/n_tau_flag'].value)
+
     def define_flame_disc(self, center, radius):
-        """Define flame as parallelogram"""
+        """Define flame as disc"""
         self.metas.generation_method = "analytical2D_disc"
         self.shape = Disc(center, radius)
-        #self.metas.shape_params = np.hstack((center, radius))
         self.make_mesh()
 
     def define_flame_parallelogram(self, xref, vec1, vec2):
         """Define flame as parallelogram"""
         self.metas.generation_method = "analytical2D_parallelogram"
         self.shape = Parallelogram(xref, vec1, vec2)
-        #self.metas.shape_params = np.hstack((xref, vec1, vec2))
         self.make_mesh()
 
     def define_flame_sphere(self, center, radius):
         """Define spherical flame"""
         self.metas.generation_method = "analytical3D_sphere"
         self.shape = Sphere(center, radius)
-        #self.metas.shape_params = np.hstack((center, radius))
         self.make_mesh()
 
     def define_flame_cylinder(self, center, radius, vector):
@@ -216,19 +210,18 @@ class ActiveFlame(object):
         self.log.debug("Defining cylinder flame")
         self.metas.generation_method = "analytical3D_cylinder"
         self.shape = Cylinder(center, radius, vector)
-        #self.metas.shape_params = np.hstack((center, radius, vector))
         self.make_mesh()
 
     def define_flame_parallelepiped(self, xref, vec1, vec2, vec3):
         """Define flame as parallelepiped"""
         self.metas.generation_method = "analytical3D_parallelepiped"
         self.shape = Parallelepiped(xref, vec1, vec2, vec3)
-        #self.metas.shape_params = np.hstack((xref, vec1, vec2, vec3))
         self.make_mesh()
 
     def make_mesh(self):
         """Use bounding box to create box mesh containing flame geometry"""
         self.metas.ndim = self.shape.ndim
+        self.metas.shape_params = shape2json(self.shape)
         self.metas.pt_min = copy.deepcopy(self.shape.vects["pt_min"])
         self.metas.pt_max = copy.deepcopy(self.shape.vects["pt_max"])
         self.exec_hip(self._get_hip_script_generate())
@@ -279,7 +272,7 @@ class ActiveFlame(object):
           wr hd ./flame_{0}""".format(self.metas.name, rot))
         self.exec_hip(rotate_script)
 
-        self.read_shape()
+        self._read_scatter_pts("flame_{}.sol.h5".format(self.metas.name))
 
         interp_script = ["re -a flame_{0}.mesh.h5 -s -s flame_{0}.sol.h5"]
         interp_script += self._get_hip_script_generate().split("\n")
@@ -287,18 +280,6 @@ class ActiveFlame(object):
         self.exec_hip('\n'.join(interp_script))
         self.make_mesh()
 
-    def read_shape(self):
-        """Read shape from meshpoints (only creates ScatterShape type)"""
-        self.read_meshpoints()
-        pt_min = self.meshpoints.min(axis=0)
-        pt_max = self.meshpoints.max(axis=0)
-        self.shape = (
-                ScatterShape2D(pt_min[0], pt_max[0],
-                               pt_min[1], pt_max[1]) if len(pt_min) == 2 else
-                ScatterShape3D(pt_min[0], pt_max[0],
-                               pt_min[1], pt_max[1],
-                               pt_min[2], pt_max[2]))
-            
     def export_avsp(self, avsp_mesh, avsp_sol):
         """Export flame to AVSP solution"""
         self.write_h5(with_mesh=True)
@@ -346,6 +327,9 @@ class ActiveFlame(object):
             if with_metas: self.metas.write_h5(f["/Additionals"].attrs)
             if 'analytical' in self.metas.generation_method:
                 f['/Additionals/n_tau_flag'] = 1.0*self.shape.is_inside(self.meshpoints)
+                if DEBUG:
+                    for i,x in enumerate(self.shape.project(self.meshpoints)):
+                        f['/Additionals/x{}'.format(i)] = x
             else:
                 f['/Additionals/n_tau_flag'] = self.shape.inside_points
             f.create_group("/Parameters")
@@ -384,10 +368,24 @@ class ActiveFlame(object):
         self.load_metas(path)
         self.log.info("Loaded flame named " + self.metas.name)
         self.log.debug(repr(self.metas.__dict__))
-        self.read_shape(path)
+        self.read_shape()
         self.make_mesh()
         self.read_meshpoints()
 
+    def read_shape(self):
+        """Read shape from meshpoints (only creates ScatterShape type)"""
+        self.shape = json2shape(self.metas.shape_params)
+        if "ScatterShape" in shape:
+            self._read_scatter_pts(self.flame_file)
+        #if shape in "ScatterShape2D ScatterShape3D":
+        #    self.read_meshpoints()
+        #    pt_min = self.meshpoints.min(axis=0)
+        #    pt_max = self.meshpoints.max(axis=0)
+        #    args = ([pt_min[0], pt_max[0], pt_min[1], pt_max[1]]
+        #            if len(pt_min) == 2 else
+        #            [pt_min[0], pt_max[0], pt_min[1],
+        #             pt_max[1], pt_min[2], pt_max[2]])
+            
     def load_metas(self, path):
         """Load only the metas of flame at path"""
         self.log.debug("Loading metas for file " + path)
