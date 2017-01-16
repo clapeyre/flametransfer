@@ -8,7 +8,7 @@ Created January 2017 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 import json
 
 from collections import OrderedDict
-from numpy import array as nparray
+import numpy as np
 
 import geometry
 from constants import VERSION, GRID_SIZE
@@ -20,7 +20,7 @@ class FlameMetas(object):
         # Calling object.__setattr__ is an approved workaround 
         object.__setattr__(self, "mandatory_vals",
                            "name version grid_size ndim generation_method "
-                           "n2_tau".split())
+                           "volume n2_tau".split())
         object.__setattr__(self, "mandatory_vecs", 
                            "pt_min pt_max pt_ref vec_ref".split())
         object.__setattr__(self, "static", OrderedDict((
@@ -38,6 +38,7 @@ class FlameMetas(object):
         See set_vect to ensure value goes to self.vects
         """
         if name in self.vects.keys():
+            assert value.ndim == self.ndim, "Vector/flame dimension mismatch"
             self.vects[name] = value
         else:
             self.static[name] = value
@@ -108,3 +109,5 @@ class FlameMetas(object):
         """Apply transformation to metas"""
         [getattr(v, method)(*args) if v is not None else None
          for v in self.vects.values()]
+        if method == "scale": 
+            self.volume *= np.prod(*args)

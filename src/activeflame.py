@@ -24,7 +24,7 @@ from textwrap import dedent
 from StringIO import StringIO
 from tempfile import TemporaryFile
 
-from geometry import (Parallelepiped, Sphere, Cylinder, Parallelogram, Disc,
+from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc,
                       ScatterShape2D, ScatterShape3D, NormalVector, Vector,
                       Point, json2shape, shape2json)
 from flamemetas import FlameMetas
@@ -62,6 +62,7 @@ class ActiveFlame(object):
 
     def exec_hip(self, script):
         """Execute the current hip script."""
+        script += "\nqu\n"
         path = 'script.hip'
         self.last_hip_output = ""
         self.log.debug("Executing hip script:") 
@@ -121,33 +122,32 @@ class ActiveFlame(object):
 
     def define_threshold_flame(self, avbp_mesh, avbp_sol, field, thresh):
         """Define flame from avbp scalar and threshold"""
-        mesh = File(avbp_mesh, 'r')
-        sol = File(avbp_sol, 'r')
-        def find_field(name):
-            if field.lower() in name.lower(): return name
-        selected_field = sol.visit(find_field)
-        if selected_field is None:
-            print "*** no field containing {0} found in {1}".format(field, avbp_sol)
-            return
-        data = sol[sol.visit(find_field)].value
-        above = data > np.float(thresh)
-        x = mesh["Coordinates/x"].value
-        y = mesh["Coordinates/y"].value
-        x_in = x[above]
-        y_in = y[above]
-        pt_min = [x_in.min(), y_in.min()]
-        pt_max = [x_in.max(), y_in.max()]
-        klass = ScatterShape2D
-        self.metas.generation_method = "avbp_scalar_threshold_2D"
-        if 'z' in mesh["Coordinates"].keys():
-            self.metas.generation_method = "avbp_scalar_threshold_3D"
-            z = mesh["Coordinates/z"].value
-            z_in = z[above]
-            pt_min += [z_in.min()]
-            pt_max += [z_in.max()]
-            klass = ScatterShape3D
+        with File(avbp_mesh, 'r') as mesh, File(avbp_sol, 'r') as sol:
+            def find_field(name):
+                if field.lower() in name.lower(): return name
+            selected_field = sol.visit(find_field)
+            if selected_field is None:
+                print "*** no field containing {0} found in {1}".format(field, avbp_sol)
+                return
+            data = sol[sol.visit(find_field)].value
+            above = data > np.float(thresh)
+            x = mesh["Coordinates/x"].value
+            y = mesh["Coordinates/y"].value
+            x_in = x[above]
+            y_in = y[above]
+            pt_min = [x_in.min(), y_in.min()]
+            pt_max = [x_in.max(), y_in.max()]
+            klass = ScatterShape2D
+            self.metas.generation_method = "avbp_scalar_threshold_2D"
+            if 'z' in mesh["Coordinates"].keys():
+                self.metas.generation_method = "avbp_scalar_threshold_3D"
+                z = mesh["Coordinates/z"].value
+                z_in = z[above]
+                pt_min += [z_in.min()]
+                pt_max += [z_in.max()]
+                klass = ScatterShape3D
         self.log.debug("Generating scattershape from AVBP")
-        self.shape = klass(pt_min, pt_max)
+        self._shape_metas(klass(pt_min, pt_max))
         self.make_mesh()
         with File("dummy_avbp.h5", 'w') as f:
             f.create_group
@@ -184,48 +184,68 @@ class ActiveFlame(object):
 
     def _read_scatter_pts(self, path):
         """Read scatter points from flame file"""
-        self.shape.inside_points = (
-                File(path, 'r')['Additionals/n_tau_flag'].value)
+        with File(path, 'r') as f:
+            self.inside_points = f['Additionals/n_tau_flag'].value
 
     def define_flame_disc(self, center, radius):
         """Define flame as disc"""
         self.metas.generation_method = "analytical2D_disc"
-        self.shape = Disc(center, radius)
-        self.make_mesh()
+        self._make_analytic_shape(Disc(center, radius))
 
-    def define_flame_parallelogram(self, xref, vec1, vec2):
-        """Define flame as parallelogram"""
-        self.metas.generation_method = "analytical2D_parallelogram"
-        self.shape = Parallelogram(xref, vec1, vec2)
-        self.make_mesh()
+    def define_flame_rectangle(self, pt_min, pt_max):
+        """Define flame as rectangle"""
+        self.metas.generation_method = "analytical2D_rectangle"
+        self._make_analytic_shape(Rectangle(pt_min, pt_max))
 
     def define_flame_sphere(self, center, radius):
         """Define spherical flame"""
         self.metas.generation_method = "analytical3D_sphere"
-        self.shape = Sphere(center, radius)
-        self.make_mesh()
+        self._make_analytic_shape(Sphere(center, radius))
 
     def define_flame_cylinder(self, center, radius, vector):
         """Define cylindrical flame"""
         self.log.debug("Defining cylinder flame")
         self.metas.generation_method = "analytical3D_cylinder"
-        self.shape = Cylinder(center, radius, vector)
-        self.make_mesh()
+        self._make_analytic_shape(Cylinder(center, radius, vector))
 
-    def define_flame_parallelepiped(self, xref, vec1, vec2, vec3):
-        """Define flame as parallelepiped"""
-        self.metas.generation_method = "analytical3D_parallelepiped"
-        self.shape = Parallelepiped(xref, vec1, vec2, vec3)
+    def define_flame_brick(self, pt_min, pt_max):
+        """Define flame as brick"""
+        self.metas.generation_method = "analytical3D_brick"
+        self._make_analytic_shape(Brick(pt_min, pt_max))
+
+    def _shape_metas(self, shape):
+        self.metas.ndim = shape.ndim
+        self.metas.pt_min = copy.deepcopy(shape.vects["pt_min"])
+        self.metas.pt_max = copy.deepcopy(shape.vects["pt_max"])
+        self.metas.volume = shape.volume
+        self.metas.shape_params = shape2json(shape)
+
+    def _make_analytic_shape(self, shape):
+        self._shape_metas(shape)
         self.make_mesh()
+        self.inside_points = 1.0*shape.is_inside(self.meshpoints)
 
     def make_mesh(self):
-        """Use bounding box to create box mesh containing flame geometry"""
-        self.metas.ndim = self.shape.ndim
-        self.metas.shape_params = shape2json(self.shape)
-        self.metas.pt_min = copy.deepcopy(self.shape.vects["pt_min"])
-        self.metas.pt_max = copy.deepcopy(self.shape.vects["pt_max"])
+        """Create and read mesh for flame
+        
+        Use bounding box to create box mesh containing flame geometry
+        Then read resulting meshoints"""
         self.exec_hip(self._get_hip_script_generate())
-        self.read_meshpoints()
+        self._read_meshpoints()
+
+    def _read_meshpoints(self):
+        """Read ouput hdf5 meshfile and store coordinates"""
+        with File(self.mesh_file, 'r') as f:
+            if self.metas.ndim == 2:
+                self.meshpoints = np.array((f['/Coordinates/x'].value,
+                                            f['/Coordinates/y'].value)).T
+            elif self.metas.ndim == 3:
+                self.meshpoints = np.array((f['/Coordinates/x'].value,
+                                            f['/Coordinates/y'].value,
+                                            f['/Coordinates/z'].value)).T
+            else:
+                raise ValueError("ndim must be defined")
+            self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:,0].size))
 
     def _get_hip_script_generate(self):
         """Write hip script for mesh generation"""
@@ -244,41 +264,42 @@ class ActiveFlame(object):
                       self.metas.grid_size, line_3d, self.metas.name)
         return hip_script
 
-    def transform(self, trans, args):
+    def transform(self, trans, *args):
         """Apply transformation to flame"""
         if trans == "t":
-            self.shape.translate(args)
-            self.metas.transform("translate", args)
-            self.make_mesh()
+            self.metas.transform("translate", *args)
         elif trans == "s":
-            self.shape.scale(args)
-            self.metas.transform("scale", args)
-            self.make_mesh()
+            self.metas.transform("scale", *args)
         elif trans == "r":
-            # In this special case, flame generation method is lost (becomes ScatterShape)
-            self.metas.transform("rotate", args)
+            self.metas.transform("rotate", *args)
+            # Special case: box must be rotated, then interpolated back on a
+            # cartesian grid aligned with x,y[,z]
             self._rotate(*args)
         else:
             raise ValueError
+        self.make_mesh()
 
     def _rotate(self, axis, angle, degrees=True):
-        """Write and rotate flame in hip, then recreate mesh"""
+        """Write and rotate flame in hip, then recreate x,y[,z] aligned mesh"""
         self.write_h5(with_mesh=True)
         if not degrees: angle *= 180./np.pi
-        rot = "tr ro {0} {1}".format(axis, angle)
         rotate_script = dedent("""\
-          re -a flame_{0}.mesh.h5 -s flame_{0}.sol.h5
-          {1}
-          wr hd ./flame_{0}""".format(self.metas.name, rot))
+          re hd -a flame_{0}.mesh.h5 -s flame_{0}.sol.h5
+          tr ro {1} {2}
+          wr hd ./flame_{0}
+          """.format(self.metas.name, axis, angle))
         self.exec_hip(rotate_script)
 
-        self._read_scatter_pts("flame_{}.sol.h5".format(self.metas.name))
+        self._read_scatter_pts(self.flame_file)
+        self._read_meshpoints()
+        flamepoints = self.meshpoints[self.inside_points > 0.01]
+        self.metas.pt_min = Point(flamepoints.min(0))
+        self.metas.pt_max = Point(flamepoints.max(0))
 
-        interp_script = ["re -a flame_{0}.mesh.h5 -s -s flame_{0}.sol.h5"]
+        interp_script = ["re hd -a flame_{0}.mesh.h5 -s flame_{0}.sol.h5".format(self.metas.name)]
         interp_script += self._get_hip_script_generate().split("\n")
         interp_script.insert(3, "in gr 1")
         self.exec_hip('\n'.join(interp_script))
-        self.make_mesh()
 
     def export_avsp(self, avsp_mesh, avsp_sol):
         """Export flame to AVSP solution"""
@@ -305,33 +326,13 @@ class ActiveFlame(object):
                       )
         return hip_script
 
-    def read_meshpoints(self):
-        """Read hdf5 meshfile from hip and store coordinates"""
-        assert self.metas.ndim is not None, "ndim must be defined"
-        with File(self.mesh_file, 'r') as f:
-            if self.metas.ndim == 2:
-                self.meshpoints = np.array((f['/Coordinates/x'].value,
-                                            f['/Coordinates/y'].value)).T
-            else:
-                self.meshpoints = np.array((f['/Coordinates/x'].value,
-                                            f['/Coordinates/y'].value,
-                                            f['/Coordinates/z'].value)).T
-            self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:,0].size))
-
     def write_h5(self, with_metas=True, with_mesh=False):
         """Write h5 file for flame"""
         assert self.meshpoints is not None
-        if self.shape is None: self.read_shape()
         with File(self.flame_file, 'w') as f:
             f.create_group("/Additionals")
             if with_metas: self.metas.write_h5(f["/Additionals"].attrs)
-            if 'analytical' in self.metas.generation_method:
-                f['/Additionals/n_tau_flag'] = 1.0*self.shape.is_inside(self.meshpoints)
-                if DEBUG:
-                    for i,x in enumerate(self.shape.project(self.meshpoints)):
-                        f['/Additionals/x{}'.format(i)] = x
-            else:
-                f['/Additionals/n_tau_flag'] = self.shape.inside_points
+            f['/Additionals/n_tau_flag'] = self.inside_points
             f.create_group("/Parameters")
             f['/Parameters/ndim'] = np.array([self.metas.ndim])
             f['/Parameters/nnode'] = np.array([self.meshpoints.size])
@@ -368,24 +369,9 @@ class ActiveFlame(object):
         self.load_metas(path)
         self.log.info("Loaded flame named " + self.metas.name)
         self.log.debug(repr(self.metas.__dict__))
-        self.read_shape()
         self.make_mesh()
-        self.read_meshpoints()
+        self._read_scatter_pts(path)
 
-    def read_shape(self):
-        """Read shape from meshpoints (only creates ScatterShape type)"""
-        self.shape = json2shape(self.metas.shape_params)
-        if "ScatterShape" in shape:
-            self._read_scatter_pts(self.flame_file)
-        #if shape in "ScatterShape2D ScatterShape3D":
-        #    self.read_meshpoints()
-        #    pt_min = self.meshpoints.min(axis=0)
-        #    pt_max = self.meshpoints.max(axis=0)
-        #    args = ([pt_min[0], pt_max[0], pt_min[1], pt_max[1]]
-        #            if len(pt_min) == 2 else
-        #            [pt_min[0], pt_max[0], pt_min[1],
-        #             pt_max[1], pt_min[2], pt_max[2]])
-            
     def load_metas(self, path):
         """Load only the metas of flame at path"""
         self.log.debug("Loading metas for file " + path)
@@ -394,50 +380,4 @@ class ActiveFlame(object):
         if float(self.metas.version) > float(VERSION):
             self.log.error("Cannot read future version flame. Please update your FlameTransfer app")
             raise ValueError
-
-    #def recreate_shape(self, path):
-    #    """Create self.shape again based on metas"""
-    #    self.log.info("Recreating shape " + self.metas.generation_method)
-    #    if self.metas.generation_method == "analytical2D_disc":
-    #        center = self.metas.shape_params[:2]
-    #        radius = self.metas.shape_params[2]
-    #        self.shape = Disc(center, radius)
-    #    elif self.metas.generation_method == "analytical2D_parallelogram":
-    #        xref = self.metas.shape_params[:2]
-    #        vec1 = self.metas.shape_params[2:4]
-    #        vec2 = self.metas.shape_params[4:]
-    #        self.shape = Parallelogram(xref, vec1, vec2)
-    #    elif self.metas.generation_method == "analytical3D_sphere":
-    #        center = self.metas.shape_params[:3]
-    #        radius = self.metas.shape_params[3]
-    #        self.shape = Sphere(center, radius)
-    #    elif self.metas.generation_method == "analytical3D_cylinder":
-    #        center = self.metas.shape_params[:3]
-    #        radius = self.metas.shape_params[3]
-    #        vector = self.metas.shape_params[4:]
-    #        self.shape = Cylinder(center, radius, vector)
-    #    elif self.metas.generation_method == "analytical3D_parallelepiped":
-    #        xref = self.metas.shape_params[:3]
-    #        vec1 = self.metas.shape_params[3:6]
-    #        vec2 = self.metas.shape_params[6:9]
-    #        vec3 = self.metas.shape_params[9:]
-    #        self.shape = Parallelepiped(xref, vec1, vec2, vec3)
-    #    elif "avbp_scalar_threshold" in self.metas.generation_method:
-    #        if self.metas.ndim == 2:
-    #            self.shape = ScatterShape2D(
-    #                    self.metas.xmin, self.metas.xmax,
-    #                    self.metas.ymin, self.metas.ymax,
-    #                    )
-    #        else:
-    #            self.shape = ScatterShape3D(
-    #                    self.metas.xmin, self.metas.xmax,
-    #                    self.metas.ymin, self.metas.ymax,
-    #                    self.metas.zmin, self.metas.zmax,
-    #                    )
-    #        with File(path, 'r') as f:
-    #            self.shape.inside_points = f['Additionals/n_tau_flag'].value
-    #    else:
-    #        self.log.error("Unknown flame generation method")
-    #        raise ValueError
-
 

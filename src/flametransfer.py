@@ -90,6 +90,11 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
     flames = []
     cur_fl = None
 
+    def precmd(self, line):
+        """Reprint the line to know what is executed"""
+        #print "\n >>> executing: ", line
+        return line
+
     def help_about(self):
         print dedent("""
                 --------------------------------
@@ -116,7 +121,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
 
                 ft > gen<tab>
                 ft > generate <tab>
-                avbp_field     circle         cylinder       parallelogram  sphere 
+                avbp_field     disc         cylinder         sphere 
 
                 Awesome, right?
                 """)
@@ -154,7 +159,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         """Empty line behavior: do nothing"""
         pass
 
-    generators = "avbp_field disc cylinder parallelogram sphere".split()
+    generators = "avbp_field disc cylinder rectangle brick sphere".split()
     def do_generate(self, s):
         args = s.split()
         if len(args) != 2:
@@ -167,24 +172,16 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             radius = input_floats(raw_input('Circle radius (r)   : '))[0]
             self.cur_fl = ActiveFlame(name, self.hip_exec)
             self.cur_fl.define_flame_disc(center, radius)
-        elif typ == "p": # parallelogram
-            dim = int(raw_input('Number of dimensions (2 or 3) : '))
-            if dim == 2:
-                xref = input_floats(raw_input('Corner point  (x y) : '))
-                vec1 = input_floats(raw_input('Side vector 1 (x y) : '))
-                vec2 = input_floats(raw_input('Side vector 2 (x y) : '))
-                self.cur_fl = ActiveFlame(name, self.hip_exec)
-                self.cur_fl.define_flame_parallelogram(xref, vec1, vec2)
-            elif dim == 3:
-                xref = input_floats(raw_input('Corner point  (x y z) : '))
-                vec1 = input_floats(raw_input('Side vector 1 (x y z) : '))
-                vec2 = input_floats(raw_input('Side vector 2 (x y z) : '))
-                vec3 = input_floats(raw_input('Side vector 3 (x y z) : '))
-                self.cur_fl = ActiveFlame(name, self.hip_exec)
-                self.cur_fl.define_flame_parallelepiped(xref, vec1, vec2, vec3)
-            else:
-                print "*** nope, it's either 2 or 3"
-                return
+        elif typ == "r": # rectangle
+            pt_min = input_floats(raw_input('Min point  (x y) : '))
+            pt_max = input_floats(raw_input('Max point  (x y) : '))
+            self.cur_fl = ActiveFlame(name, self.hip_exec)
+            self.cur_fl.define_flame_rectangle(pt_min, pt_max)
+        elif typ == "b": # brick
+            pt_min = input_floats(raw_input('Min point  (x y z) : '))
+            pt_max = input_floats(raw_input('Max point  (x y z) : '))
+            self.cur_fl = ActiveFlame(name, self.hip_exec)
+            self.cur_fl.define_flame_brick(pt_min, pt_max)
         elif typ == "s": # sphere
             center = input_floats(raw_input('Sphere center (x y z) : '))
             radius = input_floats(raw_input('Sphere radius (r)     : '))
@@ -214,7 +211,6 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             print "*** unkown flame shape"
             return
         self.flames.append(self.cur_fl)
-        self.cur_fl.read_meshpoints()
         #self.do_shell("rm mesh_{}.*".format(self.cur_fl.metas.name))
 
     def help_generate(self):
@@ -285,7 +281,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             for i, f in enumerate(self.flames) :
                 star = "*" if f == self.cur_fl else " "
                 out.write("{0} {1:2} {2:{width}}    {3}   {4:.2E}   {5: <15} {6}\n".format(
-                    star, i+1, f.metas.name, f.metas.ndim, f.shape.volume,
+                    star, i+1, f.metas.name, f.metas.ndim, f.metas.volume,
                     f.metas.pt_ref, f.metas.vec_ref, width=width+2))
         elif arg == "r": # refs
             out.write("Reference point  : {}\n".format(self.cur_fl.metas.pt_ref))
@@ -393,7 +389,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         elif switch == "r": # refs
             metas = {}
             self.cur_fl.metas.pt_ref = Point(input_floats(raw_input('Reference point  (x y z) : ')))
-            self.cur_fl.metas.vec_ref = Vector(input_floats(raw_input('Reference vector (x y z) : ')))
+            self.cur_fl.metas.vec_ref = NormalVector(input_floats(raw_input('Reference vector (x y z) : ')))
         elif switch == "n": # ntau
             typ = raw_input("Type of N : ").lower()
             if typ not in "n1 n2 n3 crocco global adim".split():
@@ -550,7 +546,7 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
         elif switch == "r":
             axis = raw_input("Rotation axis : ")
             angle = raw_input("Rotation angle (degrees) : ")
-            self.cur_fl.transform(switch, (axis, float(angle)))
+            self.cur_fl.transform(switch, axis, float(angle))
         else:
             print "*** Accepted transforms : " + " ".join(self.transforms)
             return

@@ -25,7 +25,8 @@ class Vector(object):
         self.ndim = len(vect)
         self.vect = np.array(vect).reshape(-1, 1)
 
-    def __call__(self): return self.vect.reshape(-1)
+    def __call__(self):
+        return self.vect.ravel()
 
     @property
     def length(self): return np.linalg.norm(self.vect)
@@ -48,7 +49,8 @@ class Vector(object):
                 rotate = np.mat([[math.cos(angle), -math.sin(angle), 0],
                                  [math.sin(angle), math.cos(angle), 0],
                                  [0, 0, 1]])
-        self.vect = rotate * self.vect[:]
+        # WARNING: np.array necessary to not get a np.mat as result
+        self.vect = np.array(rotate * self.vect[:])
 
     def scale(self, vect):
         """Scale (negative accepted, 0 refused)"""
@@ -99,7 +101,7 @@ class Shape2D(Shape):
         Shape.__init__(self, 2)
 
     def check(self):
-        assert self.area > 1.e-12
+        assert self.area > 1.e-12, "Area cannot be zero"
 
 
 class Shape3D(Shape):
@@ -107,7 +109,7 @@ class Shape3D(Shape):
         Shape.__init__(self, 3)
 
     def check(self):
-        assert self.volume > 1.e-18
+        assert self.volume > 1.e-18, "Volume cannot be zero"
 
 
 class ScatterShape2D(Shape2D):
@@ -124,8 +126,12 @@ class ScatterShape2D(Shape2D):
         # TODO: The real area should be computed...
         pt_min = self.vects["pt_min"]()
         pt_max = self.vects["pt_max"]()
-        return np.prod(pt_max - p_min)
+        return np.prod(pt_max - pt_min)
     volume = area
+
+    @property
+    def args(self):
+        return [self.vects["pt_min"](), self.vects["pt_max"]()]
 
 
 class ScatterShape3D(Shape3D):
@@ -142,7 +148,34 @@ class ScatterShape3D(Shape3D):
         # TODO: The real volume should be computed...
         pt_min = self.vects["pt_min"]()
         pt_max = self.vects["pt_max"]()
-        return np.prod(pt_max - p_min)
+        return np.prod(pt_max - pt_min)
+
+    @property
+    def args(self):
+        return [self.vects["pt_min"](), self.vects["pt_max"]()]
+
+
+class Rectangle(Shape2D):
+    def __init__(self, pt_min, pt_max):
+        Shape2D.__init__(self)
+        self.vects["pt_min"] = Point(pt_min)
+        self.vects["pt_max"] = Point(pt_max)
+        self.check()
+
+    @property
+    def area(self):
+        """Get rectangle area"""
+        vect = self.vects["pt_max"]() - self.vects["pt_min"]() 
+        return np.prod(vect)
+    volume = area
+
+    @property
+    def args(self):
+        return [self.vects["pt_min"](), self.vects["pt_max"]()]
+
+    def is_inside(self, x):
+        """All x are inside the rectangle"""
+        return np.ones_like(x[:,0], dtype=bool)
 
 
 class Parallelogram(Shape2D):
@@ -174,6 +207,10 @@ class Parallelogram(Shape2D):
         return abs(np.linalg.det(self.mat))
     volume = area
 
+    @property
+    def args(self):
+        return [self.vects["xref"](), self.vects["vec1"](), self.vects["vec2"]()]
+
     def project(self, x):
         """Project vector x on basis formed by parallelogram
         
@@ -191,6 +228,28 @@ class Parallelogram(Shape2D):
         """Determine if x is inside the parallelogram"""
         a, b = self.project(x)
         return (a <= 1) & (a >= 0) & (b <= 1) & (b >= 0)
+
+
+class Brick(Shape3D):
+    def __init__(self, pt_min, pt_max):
+        Shape3D.__init__(self)
+        self.vects["pt_min"] = Point(pt_min)
+        self.vects["pt_max"] = Point(pt_max)
+        self.check()
+
+    @property
+    def volume(self):
+        """Get brick volume"""
+        vect = self.vects["pt_max"]() - self.vects["pt_min"]() 
+        return np.prod(vect)
+
+    @property
+    def args(self):
+        return [self.vects["pt_min"](), self.vects["pt_max"]()]
+
+    def is_inside(self, x):
+        """All x are inside the brick"""
+        return np.ones_like(x[:,0], dtype=bool)
 
 
 class Parallelepiped(Shape3D):
@@ -212,6 +271,11 @@ class Parallelepiped(Shape3D):
     def volume(self):
         """Get parallelogram volume"""
         return abs(np.linalg.det(self.mat))
+
+    @property
+    def args(self):
+        return [self.vects["xref"](), self.vects["vec1"](),
+                self.vects["vec2"](), self.vects["vec3"]()]
 
     def bounding_box(self):
         """Set bounding box for shape"""
@@ -264,6 +328,10 @@ class Disc(Shape2D):
         self.vects["pt_max"] = Point(self.vects["center"]() + self.radius)
 
     @property
+    def args(self):
+        return [self.vects["center"](), self.radius]
+
+    @property
     def area(self):
         """Get disc area"""
         return np.pi * self.radius**2
@@ -290,6 +358,10 @@ class Sphere(Shape3D):
         """Set bounding box for shape"""
         self.vects["pt_min"] = Point(self.vects["center"]() - self.radius)
         self.vects["pt_max"] = Point(self.vects["center"]() + self.radius)
+
+    @property
+    def args(self):
+        return [self.vects["center"](), self.radius]
 
     @property
     def volume(self):
@@ -334,6 +406,10 @@ class Cylinder(Shape3D):
         self.vects["pt_max"] = Point([xmax, ymax, zmax])
 
     @property
+    def args(self):
+        return [self.vects["xref"](), self.radius, self.vects["vec"]()]
+
+    @property
     def volume(self):
         """Get cylinder volume"""
         return (np.linalg.norm(self.vects["vec"]()) * np.pi * self.radius**2)[0]
@@ -357,13 +433,22 @@ class Cylinder(Shape3D):
         return (axis >= 0.) & (axis <= 1.) & (radius <= 1.)
     
 
+def json_array(arr):
+    """Forget numpy before sending to json"""
+    try:
+        arr = arr.tolist()
+    except AttributeError:
+        pass
+    return arr
+
 def shape2json(shape):
     """Convert shape to json string"""
     out = [shape.__class__.__name__,
-           [v().tolist() for v in shape.vects.values()]]
+           [json_array(arr) for arr in shape.args]]
     return json.dumps(out)
 
 def json2shape(json_string):
+    """Create shape from json string"""
     klass, args = json.loads(json_string)
     return globals()[klass](*args)
 
