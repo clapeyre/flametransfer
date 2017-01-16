@@ -15,11 +15,11 @@
         </desc>
     </model>
     <model name="rename_flame" title="Rename existing flame">
-        <choice name="cho_flame" title="Flame to rename" require="list_libobjs_in_project" />
+        <choice name="cho_flame" title="Flame to rename" require="list_written_libobjs" />
         <param name="input_flame_name" title="New name" type="string" default=""/>
     </model>
     <model name="delete_flame" title="Delete flame">
-        <choice name="cho_flame" title="Flame to delete" require="list_libobjs_in_project" />
+        <choice name="cho_flame" title="Flame to delete" require="list_written_libobjs" />
         <desc>
             WARNING : any associated .h5 file will be permanently deleted
         </desc>
@@ -28,8 +28,9 @@
 
 <model name="flame_library" title="Flame list" >
     <multiple name="mul_libobjs" title="Flames" require="list_libobjs_in_project">
-        <comment name="flame_details" title="Flame details" state="disabled" />
-        <comment name="ftf_details" title="FTF details" state="disabled" />
+        <info name="written" title="Written" default="no"/>
+        <comment name="flame_details" title="Flame details" />
+        <comment name="ftf_details" title="FTF details" />
         <info name="flag_h5_exists" type="onoff" default="0" visibility="hidden" />
     </multiple>   
 </model>

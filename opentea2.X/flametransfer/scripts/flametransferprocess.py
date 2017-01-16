@@ -33,9 +33,10 @@ class FlameTransferProcess(LibProcess):
 
     def write_metas(self):
         metas = self.get_metas()
-        for order, flame_name in enumerate(self.libobjs):
+        for order, flame_name in enumerate(set(self.libobjs)-set(self.unwritten_libobjs)):
             ipcode="item_{0:07d}".format(order)
             self.ds.addChild(ipcode, flame_name, "mul_libobjs")
+            self.ds.addChild("written", "yes", ipcode, "mul_libobjs")
             self.ds.addChild(
                     "flame_details", metas[flame_name]["generation_method"],
                     ipcode, "mul_libobjs")
@@ -46,6 +47,7 @@ class FlameTransferProcess(LibProcess):
         for order, flame_name in enumerate(self.unwritten_libobjs):
             ipcode="item_{0:07d}".format(order + len(self.libobjs))
             self.ds.addChild(ipcode, flame_name, "mul_libobjs")
+            self.ds.addChild("written", "no", ipcode, "mul_libobjs")
             self.ds.addChild("flame_details", "not set", ipcode, "mul_libobjs")
             self.ds.addChild("ftf_details", "not set", ipcode, "mul_libobjs")
 

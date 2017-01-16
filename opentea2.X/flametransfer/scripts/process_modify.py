@@ -30,21 +30,18 @@ def process_modify(pr):
         script = ["ge disc " + label,
                   "{0[0]} {0[1]}".format(center),
                   "{}".format(radius)]
-    elif flame_geo == "analytical2D_parallelogram":
-        center = ds.getListValue("ana_flame_center", "modify")[1::2]
-        vector1 = ds.getListValue("ana_flame_vector1", "modify")[1::2]
-        vector2 = ds.getListValue("ana_flame_vector2", "modify")[1::2]
-        script = ["ge parallelogram " + label, "2"]
+    elif flame_geo == "analytical2D_rectangle":
+        pt_min = ds.getListValue("ana_flame_pt_min", "modify")[1::2]
+        pt_max = ds.getListValue("ana_flame_pt_max", "modify")[1::2]
+        script = ["ge rect " + label]
         script += ["{0[0]} {0[1]}".format(vect)
-                   for vect in [center, vector1, vector2]]
-    elif flame_geo == "analytical3D_parallelepiped":
-        center = ds.getListValue("ana_flame_center", "modify")[1::2]
-        vector1 = ds.getListValue("ana_flame_vector1", "modify")[1::2]
-        vector2 = ds.getListValue("ana_flame_vector2", "modify")[1::2]
-        vector3 = ds.getListValue("ana_flame_vector3", "modify")[1::2]
-        script = ["ge parallelogram " + label, "3"]
+                   for vect in [pt_min, pt_max]]
+    elif flame_geo == "analytical3D_brick":
+        pt_min = ds.getListValue("ana_flame_pt_min", "modify")[1::2]
+        pt_max = ds.getListValue("ana_flame_pt_max", "modify")[1::2]
+        script = ["ge brick " + label]
         script += ["{0[0]} {0[1]} {0[2]}".format(vect)
-                   for vect in [center, vector1, vector2, vector3]]
+                   for vect in [pt_min, pt_max]]
     elif flame_geo == "analytical3D_sphere":
         center = ds.getListValue("ana_flame_center", "modify")[1::2]
         radius = ds.getValue("ana_flame_radius", "modify")
@@ -76,8 +73,8 @@ def process_modify(pr):
     else:
         raise XDRUnknownValue(
           "xor_flame_geo", flame_geo,
-          "analytical2D_disc analytical2D_parallelogram"
-          " analytical3D_parallelepiped analytical3D_sphere"
+          "analytical2D_disc analytical2D_rectangle"
+          " analytical3D_brick analytical3D_sphere"
           " analytical3D_cylinder scal_and_thresh")
 
     n_tau_type = ds.getValue("xor_n_and_tau", "modify")
@@ -120,7 +117,6 @@ def update_flame_params(pr):
     ds = pr.ds
     selected_flame = ds.getValue("cho_update_flame_params")
     metas = pr.get_metas(paths=[pr.libobj_file(selected_flame)])[selected_flame]
-    print metas
     ds.removeNode("xor_ndim")
     ndim = "three_d" if "3D" in metas["generation_method"] else "two_d"
     ds.addChild("xor_ndim", ndim, "modify")
@@ -131,25 +127,21 @@ def update_flame_params(pr):
     ds.addChild("xor_flame_geo", metas["generation_method"], ndim)
     ds.addChild(metas["generation_method"], "", "xor_flame_geo")
     sh_args = json.loads(metas["shape_params"])[1]
-    print sh_args
     if metas["generation_method"] == "analytical2D_disc":
         ds.addChild("ana_flame_center", to_ds_list('xy', sh_args[0]), metas["generation_method"])
         ds.addChild("ana_flame_radius", str(sh_args[1]), metas["generation_method"])
-    elif metas["generation_method"] == "analytical2D_parallelogram":
-        ds.addChild("ana_flame_center", to_ds_list('xy', sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_vector1", to_ds_list('u1_x u1_y'.split(), sh_args[1]), metas["generation_method"])
-        ds.addChild("ana_flame_vector2", to_ds_list('u2_x u2_y'.split(), sh_args[2]), metas["generation_method"])
-    elif metas["generation_method"] == "analytical3D_parallelepiped":
-        ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_vector1", to_ds_list('u1_x u1_y u1_z'.split(), sh_args[1]), metas["generation_method"])
-        ds.addChild("ana_flame_vector2", to_ds_list('u2_x u2_y u2_z'.split(), sh_args[2]), metas["generation_method"])
-        ds.addChild("ana_flame_vector3", to_ds_list('u3_x u3_y u3_z'.split(), sh_args[3]), metas["generation_method"])
+    elif metas["generation_method"] == "analytical2D_rectangle":
+        ds.addChild("ana_flame_pt_min", to_ds_list('ptmin_x ptmin_y'.split(), sh_args[0]), metas["generation_method"])
+        ds.addChild("ana_flame_pt_max", to_ds_list('ptmax_x ptmax_y'.split(), sh_args[1]), metas["generation_method"])
+    elif metas["generation_method"] == "analytical3D_brick":
+        ds.addChild("ana_flame_pt_min", to_ds_list('ptmin_x ptmin_y ptmin_z'.split(), sh_args[0]), metas["generation_method"])
+        ds.addChild("ana_flame_pt_max", to_ds_list('ptmax_x ptmax_y ptmax_z'.split(), sh_args[1]), metas["generation_method"])
     elif metas["generation_method"] == "analytical3D_sphere":
         ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_radius", str(sh_args[1]), metas["generation_method"])
+        ds.addChild("ana_flame_radius", str(sh_args[1][0]), metas["generation_method"])
     elif metas["generation_method"] == "analytical3D_cylinder":
         ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_radius", str(sh_args[1]), metas["generation_method"])
+        ds.addChild("ana_flame_radius", str(sh_args[1][0]), metas["generation_method"])
         ds.addChild("ana_flame_vector", to_ds_list('u_x u_y u_z'.split(), sh_args[2]), metas["generation_method"])
     else:
         pr.log.error("Unknown generation method {}. Cannot set default values in 'modify' tab".format(metas["generation_method"]))
