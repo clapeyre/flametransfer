@@ -28,7 +28,7 @@ from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc,
                       ScatterShape2D, ScatterShape3D, NormalVector, Vector,
                       Point, json2shape, shape2json)
 from flamemetas import FlameMetas
-from constants import VERSION
+from constants import version_checker
 
 class ActiveFlame(object):
     """Flame holder class associated to a flame hdf5 file"""
@@ -376,8 +376,6 @@ class ActiveFlame(object):
         """Load only the metas of flame at path"""
         self.log.debug("Loading metas for file " + path)
         with File(path, 'r') as flame:
+            version_checker(flame['Additionals'].attrs['version'])
             self.metas.load(flame['Additionals'].attrs)
-        if float(self.metas.version) > float(VERSION):
-            self.log.error("Cannot read future version flame. Please update your FlameTransfer app")
-            raise ValueError
 
