@@ -1,4 +1,4 @@
-# FlameTransfer
+![FlameTransfer logo](opentea2.X/flametransfer/XML/flametransfer/logo.gif)
 
 Welcome to the FlameTransfer app git repository
 
