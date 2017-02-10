@@ -72,7 +72,61 @@ class ShellCmd(cmd.Cmd, object):
     help_sh = help_shell
 
 
-class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
+class SmartCmd(cmd.Cmd, object):
+    """Good featured command line
+    
+    - function / help shortcuts (as short as disambiguation permits)
+    - catch ^C
+    - catch assertion errors
+    """
+    def cmdloop_with_keyboard_interrupt(self):
+        doQuit = False
+        while doQuit != True:
+            try:
+                self.cmdloop()
+                doQuit = True
+            except KeyboardInterrupt:
+                self.intro = None
+                sys.stdout.write('\n')
+
+    def default(self, line):
+        """Override this command from cmd.Cmd to accept shorcuts"""
+        cmd, arg, _ = self.parseline(line)
+        func = [getattr(self, n) for n in self.get_names() if n.startswith('do_' + cmd)]
+        if len(func) == 0:
+            self.stdout.write('*** Unknown syntax: %s\n'%line)
+            return
+        elif len(func) > 1:
+            print '*** {} is a shorcut to several commands'.format(cmd)
+            print '    Please give more charaters for disambiguation'
+            return
+        else:
+            func[0](arg)
+
+    def do_help(self, arg):
+        """Wrapper for cmd.Cmd.do_help to accept shortcuts"""
+        if arg:
+            helper = [n[5:] for n in self.get_names() if n.startswith('help_' + arg)]
+            if len(helper) == 0:
+                self.stdout.write('*** Unknown command: %s\n'%arg)
+                return
+            elif len(helper) > 1:
+                self.stdout.write('*** {} is a shorcut to several commands'.format(cmd))
+                self.stdout.write('    Please give more charaters for disambiguation')
+                return
+            else:
+                arg = helper[0]
+        cmd.Cmd.do_help(self, arg) 
+
+    def onecmd(self, line):
+        """Wrapper for cmd.Cmd.onecmd to catch assertion errors"""
+        try:
+            cmd.Cmd.onecmd(self, line)
+        except AssertionError as err:
+            print "\n".join("*** " + l for l in err.message.split('\n'))
+
+
+class FlameTransferCmd(ExitCmd, ShellCmd, SmartCmd, cmd.Cmd, object):
     """Command line interpreter for flame transfer"""
     log = logging.getLogger(__name__)
     try:
@@ -125,35 +179,6 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
 
                 Awesome, right?
                 """)
-
-    def default(self, line):
-        """Override this command from cmd.Cmd to accept shorcuts"""
-        cmd, arg, _ = self.parseline(line)
-        func = [getattr(self, n) for n in self.get_names() if n.startswith('do_' + cmd)]
-        if len(func) == 0:
-            self.stdout.write('*** Unknown syntax: %s\n'%line)
-            return
-        elif len(func) > 1:
-            print '*** {} is a shorcut to several commands'.format(cmd)
-            print '    Please give more charaters for disambiguation'
-            return
-        else:
-            func[0](arg)
-
-    def do_help(self, arg):
-        """Wrapper for cmd.Cmd.do_help to accept shortcuts"""
-        if arg:
-            helper = [n[5:] for n in self.get_names() if n.startswith('help_' + arg)]
-            if len(helper) == 0:
-                self.stdout.write('*** Unknown command: %s\n'%arg)
-                return
-            elif len(helper) > 1:
-                self.stdout.write('*** {} is a shorcut to several commands'.format(cmd))
-                self.stdout.write('    Please give more charaters for disambiguation')
-                return
-            else:
-                arg = helper[0]
-        cmd.Cmd.do_help(self, arg) 
 
     def emptyline(self):
         """Empty line behavior: do nothing"""
@@ -391,11 +416,14 @@ class FlameTransferCmd(ExitCmd, ShellCmd, cmd.Cmd, object):
             self.cur_fl.metas.pt_ref = Point(input_floats(raw_input('Reference point  (x y z) : ')))
             self.cur_fl.metas.vec_ref = NormalVector(input_floats(raw_input('Reference vector (x y z) : ')))
         elif switch == "n": # ntau
-            typ = raw_input("Type of N : ").lower()
-            if typ not in "n1 n2 n3 crocco global adim".split():
+            typ = raw_input("Type of N : ").lower()[:2]
+            if typ not in "n1 n2 n3 cr gl ad".split():
                 print "*** unknown N type"
                 return
             path = raw_input("Path to N-tau file : ")
+            if not isfile(path):
+                print "*** file can't be accessed"
+                return
             def exp_wrapper(path):
                 with open(path, 'r') as f:
                     return StringIO(f.read().lower().replace('d', 'e'))
@@ -587,4 +615,4 @@ if __name__ == '__main__':
         print "    $ flametransfer < " + sys.argv[1]
         sys.exit()
     interpreter = FlameTransferCmd()
-    interpreter.cmdloop()
+    interpreter.cmdloop_with_keyboard_interrupt()
