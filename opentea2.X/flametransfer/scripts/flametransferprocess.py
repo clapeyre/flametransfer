@@ -25,11 +25,11 @@ class FlameTransferProcess(LibProcess):
         self.log = logging.getLogger(__name__)
         self.debug = True
 
-    def mesh_file(self, name): return "flame_{}.mesh.h5".format(name)
+    def mesh_file(self, name): return "{}.mesh.h5".format(name)
 
-    def libobj_file(self, name): return "flame_{}.sol.h5".format(name)
+    def libobj_file(self, name): return "{}.flame.h5".format(name)
 
-    def libobj_name(self, path): return basename(path)[6:-7]
+    def libobj_name(self, path): return basename(path)[:-9]
 
     def write_metas(self):
         metas = self.get_metas()
@@ -115,7 +115,7 @@ class FlameTransferProcess(LibProcess):
         names = [self.libobj_name(path) for path in paths]
         script = ["read {} metas_only\nlist json".format(basename(f))
                   for f in paths]
-        metas = ["flame_{}.metas.json".format(self.libobj_name(path)) for path in paths]
+        metas = ["{}.metas.json".format(self.libobj_name(path)) for path in paths]
         self.execute_script("-get_metas-",
                             "\n".join(script),
                             put_files=paths,

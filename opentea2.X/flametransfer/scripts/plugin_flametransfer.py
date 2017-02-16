@@ -22,7 +22,7 @@ class PluginFlametransfer(object):
             command_exe = self.hipexec + " ./script.hip"
 
         elif action in ["-get_metas-", "-create_flame-", "-duplicate-", "-rename-"]:
-            command_exe = self.flametransferexec + " < ./script.ft"
+            command_exe = self.flametransferexec + " ./script.ft"
         
         else:
             self.log.error("Unknown action " + action)

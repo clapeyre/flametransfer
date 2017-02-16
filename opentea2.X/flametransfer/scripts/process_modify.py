@@ -14,7 +14,6 @@ from os.path import isfile, basename
 
 from XDR2 import XDRException, XDRUnknownValue
 from flametransferprocess import FlameTransferProcess
-#from activeflame import ActiveFlame
 from process_library import process_library
 
 def process_modify(pr):
@@ -105,7 +104,6 @@ def process_modify(pr):
     put_files += [n_tau_path]
 
     script += ["wr fu"]
-    script += ["wr nt"]  # Just for debug
     script += ["qu\n"]
 
     pr.execute_script("-create_flame-",
