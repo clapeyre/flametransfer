@@ -5,37 +5,34 @@ Handle Read / Write of H5 Flame files.
 
 Created November 2016 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
-DEBUG = False
-
 import os
-import sys
 import time
 import logging
 import subprocess
-import commands
 import copy
-import json
+
+from os.path import isfile
+from textwrap import dedent
+from tempfile import TemporaryFile
+from glob import glob
+
 import numpy as np
 
-from os.path import join, isdir
-from math import pi
 from h5py import File
-from textwrap import dedent
-from StringIO import StringIO
-from tempfile import TemporaryFile
 
 from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc,
-                      ScatterShape2D, ScatterShape3D, NormalVector, Vector,
-                      Point, json2shape, shape2json)
+                      ScatterShape2D, ScatterShape3D, Point, shape2json)
 from flamemetas import FlameMetas
 from constants import version_checker
+
+DEBUG = False
 
 class ActiveFlame(object):
     """Flame holder class associated to a flame hdf5 file"""
     def __init__(self, name, hip_exec, **kwargs):
         self.log = logging.getLogger(__name__)
-        self.debug = True
         self.meshpoints = None
+        self.inside_points = None
         self.shape = None
         self.metas = FlameMetas(name=name)
         self.hip_exec = hip_exec
@@ -43,13 +40,46 @@ class ActiveFlame(object):
         self.__dict__.update(kwargs)
 
     @property
+    def name(self):
+        """Flame name, stored in metas"""
+        return self.metas.name
+
+    @property
     def mesh_file(self):
-        return 'flame_{0}.mesh.h5'.format(self.metas.name)
+        """Mesh file name"""
+        return '{0}.mesh.h5'.format(self.name)
+
+    @property
+    def mesh_file_hip(self):
+        """Mesh file name as written by hip"""
+        return '{0}.sol.h5'.format(self.name)
 
     @property
     def flame_file(self):
-        return 'flame_{0}.sol.h5'.format(self.metas.name)
+        """Flame file name"""
+        return '{0}.flame.h5'.format(self.name)
 
+    @property
+    def flame_file_hip(self):
+        """Flame file name as written by hip"""
+        return '{0}.sol.h5'.format(self.name)
+
+    def harmonize_flame_name(self):
+        """Hip fixes the name of output file, not as we like"""
+        print "In harmonize"
+        if isfile(self.mesh_file_hip):
+            pass # Right now, hip writes the correct file name
+        if isfile(self.flame_file_hip):
+            os.rename(self.flame_file_hip, self.flame_file)
+        print self.mesh_file_hip.replace('h5', 'xmf')
+        if isfile(self.mesh_file_hip.replace('h5', 'xmf')):
+            print "We are here"
+            with open(self.mesh_file_hip.replace('h5', 'xmf')) as xmf:
+                xmf = xmf.readlines()
+            xmf = [line.replace(self.flame_file_hip, self.flame_file)
+                   for line in xmf]
+            with open(self.mesh_file_hip.replace('h5', 'xmf'), 'w') as out:
+                out.writelines(xmf)
 
     def __getstate__(self):
         d = dict(self.__dict__)
@@ -63,19 +93,23 @@ class ActiveFlame(object):
     def exec_hip(self, script):
         """Execute the current hip script."""
         script += "\nqu\n"
-        path = 'script.hip'
+        def next_script():
+            if DEBUG:
+                scripts = glob("script_*.hip")
+                return "script_{:03}.hip".format(len(scripts)+1)
+            else:
+                return "script.hip"
+        path = next_script()
         self.last_hip_output = ""
-        self.log.debug("Executing hip script:") 
+        self.log.debug("Executing hip script:")
         [self.log.debug(" > " + line) for line in script.split('\n')]
-        with open(path, 'w') as f:
-            f.write(script)
+        with open(path, 'w') as scr:
+            scr.write(script)
         with TemporaryFile() as output:
-            process = subprocess.Popen(
-                    [self.hip_exec, path],
-                    stdin=subprocess.PIPE,
-                    stdout=output,
-                    stderr=subprocess.STDOUT
-                    )
+            process = subprocess.Popen([self.hip_exec, path],
+                                       stdin=subprocess.PIPE,
+                                       stdout=output,
+                                       stderr=subprocess.STDOUT)
             while process.poll() is None:
                 where = output.tell()
                 lines = output.read()
@@ -90,6 +124,9 @@ class ActiveFlame(object):
             self.log.debug("Hip execution log")
             for line in self.last_hip_output.split('\n'):
                 self.log.debug(line)
+            if DEBUG:
+                with open(path+".log", "w") as out:
+                    out.write(self.last_hip_output)
         print "\n --- Done executing hip"
 
     def compute_n_crocco(self, n1, area, p_mean, gamma):
@@ -109,14 +146,14 @@ class ActiveFlame(object):
 
     def set_n3_tau(self, freq, tau, n3, u_bar, q_bar):
         """Set N and tau from non dimensional values (N3)"""
-        self.u_bar = u_bar
-        self.q_bar = q_bar
+        self.metas.u_bar = u_bar
+        self.metas.q_bar = q_bar
         self.set_n2_tau(freq, tau, n3 * u_bar / q_bar)
 
     def get_n3(self):
         """Get value of N3 using u_bar and q_bar"""
         if hasattr(self.metas, "q_bar"):
-            return self.n2 * self.metas.q_bar / self.metas.u_bar
+            return self.metas.n2_tau[1, :] * self.metas.q_bar / self.metas.u_bar
         else:
             self.log.error("q_bar info not available, cannot compute n3")
 
@@ -148,23 +185,21 @@ class ActiveFlame(object):
                 klass = ScatterShape3D
         self.log.debug("Generating scattershape from AVBP")
         self._shape_metas(klass(pt_min, pt_max))
-        self.make_mesh()
-        with File("dummy_avbp.h5", 'w') as f:
-            f.create_group
-            f.create_group("/Additionals")
-            f['/Additionals/n_tau_flag'] = 1.0*above
-            f.create_group("/Parameters")
-            f['/Parameters/ndim'] = np.array([self.metas.ndim])
-            f['/Parameters/nnode'] = np.array([self.meshpoints.size])
-            f['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
-        with File("dummy_flametrans.h5", 'w') as f:
-            f.create_group
-            f.create_group("/Additionals")
-            f['/Additionals/n_tau_flag'] = 0.0*above
-            f.create_group("/Parameters")
-            f['/Parameters/ndim'] = np.array([self.metas.ndim])
-            f['/Parameters/nnode'] = np.array([self.meshpoints.size])
-            f['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
+        self.make_meshpoints()
+        with File("dummy_avbp.h5", 'w') as flame:
+            flame.create_group("/Average")
+            flame['/Average/flames'] = 1.0*above
+            flame.create_group("/Parameters")
+            flame['/Parameters/ndim'] = np.array([self.metas.ndim])
+            flame['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
+        with File("dummy_flametrans.h5", 'w') as flame:
+            flame.create_group("/Average")
+            flame['/Average/flames'] = 0.0*above
+            flame.create_group("/Parameters")
+            flame['/Parameters/ndim'] = np.array([self.metas.ndim])
+            flame['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
         script = [
                 "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
                 "re hd -a {0} -s dummy_flametrans.h5".format(self.mesh_file),
@@ -174,18 +209,14 @@ class ActiveFlame(object):
                 "qu",
                 ]
         self.exec_hip('\n'.join(script))
-        self._read_scatter_pts("dummy_flame.sol.h5")
-        if not self.debug:
+        with File("dummy_flame.sol.h5", 'r') as flame:
+            self.inside_points = flame["/Average/flames"].value
+        if not DEBUG:
             os.remove("dummy_avbp.h5")
             os.remove("dummy_flametrans.h5")
             os.remove("dummy_flame.sol.h5")
             os.remove("dummy_flame.mesh.h5")
             os.remove("dummy_flame.asciiBound")
-
-    def _read_scatter_pts(self, path):
-        """Read scatter points from flame file"""
-        with File(path, 'r') as f:
-            self.inside_points = f['Additionals/n_tau_flag'].value
 
     def define_flame_disc(self, center, radius):
         """Define flame as disc"""
@@ -222,7 +253,7 @@ class ActiveFlame(object):
 
     def _make_analytic_shape(self, shape):
         self._shape_metas(shape)
-        self.make_mesh()
+        self.make_meshpoints()
         self.inside_points = 1.0*shape.is_inside(self.meshpoints)
 
     def make_mesh(self):
@@ -231,21 +262,23 @@ class ActiveFlame(object):
         Use bounding box to create box mesh containing flame geometry
         Then read resulting meshoints"""
         self.exec_hip(self._get_hip_script_generate())
-        self._read_meshpoints()
+        self.log.info("Wrote mesh file to " + self.mesh_file)
+        os.remove("{}.asciiBound".format(self.name))
 
-    def _read_meshpoints(self):
-        """Read ouput hdf5 meshfile and store coordinates"""
-        with File(self.mesh_file, 'r') as f:
-            if self.metas.ndim == 2:
-                self.meshpoints = np.array((f['/Coordinates/x'].value,
-                                            f['/Coordinates/y'].value)).T
-            elif self.metas.ndim == 3:
-                self.meshpoints = np.array((f['/Coordinates/x'].value,
-                                            f['/Coordinates/y'].value,
-                                            f['/Coordinates/z'].value)).T
-            else:
-                raise ValueError("ndim must be defined")
-            self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:,0].size))
+    def make_meshpoints(self):
+        """Store coordinates as hip writes them"""
+        assert self.metas.ndim in [2, 3], "ndim must be defined"
+        pt_min = self.metas.pt_min
+        pt_max = self.metas.pt_max
+        points = [np.linspace(pt_min[0], pt_max[0], self.metas.grid_size),
+                  np.linspace(pt_min[1], pt_max[1], self.metas.grid_size)]
+        if self.metas.ndim == 3:
+            points.append(np.linspace(pt_min[2], pt_max[2], self.metas.grid_size))
+        out = np.array(np.meshgrid(*points)).reshape(self.metas.ndim, -1).T
+        self.meshpoints = np.roll(out, 1, axis=1)
+        #out[:, [0, 1, 2]] = out[:, [2, 0, 1]]  -> Works but only for 3d
+        #np.savetxt("mshpts_gene.dat", self.meshpoints)
+        self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:, 0].size))
 
     def _get_hip_script_generate(self):
         """Write hip script for mesh generation"""
@@ -258,10 +291,9 @@ class ActiveFlame(object):
         hip_script = dedent("""\
           ge {0[0]} {0[1]} {1[0]} {1[1]} {2} {2}
           {3}
-          wr hd ./flame_{4}
-          qu
+          wr hd ./{4}
           """).format(self.metas.pt_min, self.metas.pt_max,
-                      self.metas.grid_size, line_3d, self.metas.name)
+                      self.metas.grid_size, line_3d, self.name)
         return hip_script
 
     def transform(self, trans, *args):
@@ -277,105 +309,115 @@ class ActiveFlame(object):
             self._rotate(*args)
         else:
             raise ValueError
-        self.make_mesh()
+        self.make_meshpoints()
 
     def _rotate(self, axis, angle, degrees=True):
         """Write and rotate flame in hip, then recreate x,y[,z] aligned mesh"""
-        self.write_h5(with_mesh=True)
+        self.make_mesh()
+        self.write_h5()
         if not degrees: angle *= 180./np.pi
         rotate_script = dedent("""\
-          re hd -a flame_{0}.mesh.h5 -s flame_{0}.sol.h5
+          re hd -a {0.mesh_file} -s {0.flame_file}
           tr ro {1} {2}
-          wr hd ./flame_{0}
-          """.format(self.metas.name, axis, angle))
+          wr hd ./{3}
+          """.format(self, axis, angle, self.name))
         self.exec_hip(rotate_script)
+        self.harmonize_flame_name()
 
-        self._read_scatter_pts(self.flame_file)
-        self._read_meshpoints()
+        with File(self.flame_file, 'r') as flame:
+            self.inside_points = flame["/Average/flames"].value
+        self.make_meshpoints()
         flamepoints = self.meshpoints[self.inside_points > 0.01]
         self.metas.pt_min = Point(flamepoints.min(0))
         self.metas.pt_max = Point(flamepoints.max(0))
 
-        interp_script = ["re hd -a flame_{0}.mesh.h5 -s flame_{0}.sol.h5".format(self.metas.name)]
+        interp_script = ["re hd -a {0.mesh_file} -s {0.flame_file}".format(self)]
         interp_script += self._get_hip_script_generate().split("\n")
         interp_script.insert(3, "in gr 1")
         self.exec_hip('\n'.join(interp_script))
+        self.harmonize_flame_name()
 
-    def export_avsp(self, avsp_mesh, avsp_sol):
+    def export_avsp(self, avsp_mesh, avsp_sol, number):
         """Export flame to AVSP solution"""
-        self.write_h5(with_mesh=True)
-        self.exec_hip(self._get_hip_script_export_avsp(avsp_mesh, avsp_sol))
+        self.make_mesh()
+        self.write_h5(number=number)
+        #with File("avsp.sol.h5", "r") as f: print f["Average/flames"].value
+        self.exec_hip(self._get_expavsp_hip_script(avsp_mesh, avsp_sol))
+        self.write_h5() # Rewrite flame with values between 0 and 1
 
-    def _get_hip_script_export_avsp(self, avsp_mesh, avsp_sol):
+    def _get_expavsp_hip_script(self, avsp_mesh, avsp_sol):
         """Generate hip script for flame interpolation on AVSP mesh"""
-        hip_script = dedent("""\
+        return dedent("""\
           se ch 0
-          se in-rim 0.2
-          re hd -a flame_{0}.mesh.h5 -s flame_{0}.sol.h5
+          se in-rim 0.9
+          re hd -a {0.mesh_file} -s {0.flame_file}
           re hd -a {1} -s {2}
           in gr 1
-          zone add secteur 
-          zone 1 element add all 
-          zo 1 solparam add Ptref vec {3}
-          zo 1 solparam add Unref vec {4}
-          wr hd avsp_sol
-          ex
-          """).format(self.metas.name, avsp_mesh, avsp_sol,
-                      " ".join(str(s) for s in self.metas.pt_ref),
-                      " ".join(str(s) for s in self.metas.vec_ref),
-                      )
-        return hip_script
+          wr hd -a avsp
+          """).format(self, avsp_mesh, avsp_sol)
 
-    def write_h5(self, with_metas=True, with_mesh=False):
+    def write_h5(self, number=1):
         """Write h5 file for flame"""
-        assert self.meshpoints is not None
-        with File(self.flame_file, 'w') as f:
-            f.create_group("/Additionals")
-            if with_metas: self.metas.write_h5(f["/Additionals"].attrs)
-            f['/Additionals/n_tau_flag'] = self.inside_points
-            f.create_group("/Parameters")
-            f['/Parameters/ndim'] = np.array([self.metas.ndim])
-            f['/Parameters/nnode'] = np.array([self.meshpoints.size])
-            f['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
+        assert self.meshpoints is not None, "Flame not read/generated yet"
+        with File(self.flame_file, 'w') as flame:
+            flame.create_group("/Average")
+            flame['/Average/flames'] = np.where(self.inside_points>0.1, float(number), 0.)
+            self.write_group(flame, number=number)
+            flame.create_group("/Parameters")
+            flame['/Parameters/ndim'] = np.array([self.metas.ndim])
+            flame['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
             self.log.info("Wrote flame file to " + self.flame_file)
-        if with_mesh:
-            self.make_mesh()
-            script = [
-                    "re hd -a {0.mesh_file} -s {0.flame_file}".format(self),
-                    "wr hd flame_{0}".format(self.metas.name),
-                    "qu\n"
-                    ]
-            self.exec_hip("\n".join(script))
-            if with_metas:
-                with File(self.flame_file, 'a') as f:
-                    self.metas.write_h5(f["/Additionals"].attrs)
-            os.remove("flame_{0}.asciiBound".format(self.metas.name))
-            self.log.info(
-                    "Wrote flame and mesh files: flame_{0}.mesh.h5, "
-                    "flame_{0}.mesh.xmf, flame_{0}.sol.h5".format(self.metas.name))
 
-    def write_n_tau(self):
-        """Write ascii n_tau file for flame"""
-        assert self.metas.n2_tau is not None
-        path = 'n_tau_{}.dat'.format(self.metas.name)
-        buf = StringIO()
-        np.savetxt(buf, self.metas.n2_tau.T)
-        with open(path, 'w') as f:
-            f.write("# Frequency N2 tau  - Generated using flametransfer\n")
-            f.write(''.join([c if c.lower() != 'e' else 'd' for c in buf.getvalue()]))
-
-    def load(self, path):
-        """Load a flame at path"""
-        self.load_metas(path)
-        self.log.info("Loaded flame named " + self.metas.name)
-        self.log.debug(repr(self.metas.__dict__))
+    def write_full(self):
+        """Write mesh, flame and xmf file"""
         self.make_mesh()
-        self._read_scatter_pts(path)
+        self.write_h5()
+        script = ["re hd -a {0.mesh_file} -s {0.flame_file}".format(self),
+                  "wr hd {0.name}".format(self)]
+        self.exec_hip("\n".join(script))
+        self.harmonize_flame_name()
+        self.write_h5()
 
-    def load_metas(self, path):
-        """Load only the metas of flame at path"""
-        self.log.debug("Loading metas for file " + path)
+    def write_group(self, hdf_obj, number=1):
+        """Write full flame in /Flames/00X of hdf file"""
+        if "Flames" not in hdf_obj.keys(): hdf_obj.create_group("Flames")
+        grp = hdf_obj.create_group("/Flames/{:03}".format(number))
+        grp["n2_tau"] = self.metas.n2_tau
+        grp["pt_ref"] = self.metas.pt_ref
+        grp["vec_ref"] = self.metas.vec_ref
+        grp["flame"] = self.inside_points
+        self.metas.write_h5(grp.attrs)
+
+    def load_group(self, hdf_obj, number=1):
+        """Load all metas for flame in /Flames/00X of hdf file"""
+        assert "Flames" in hdf_obj.keys(), "HDF object doesn't contain Flame data"
+        grp = hdf_obj["/Flames/{:03}".format(number)]
+        version_checker(grp.attrs['version'])
+        self.metas.load(grp.attrs)
+
+    def read_inside_pts(self, hdf_obj, number=1):
+        """Read inside points in /Flames/00X of hdf file"""
+        self.inside_points = hdf_obj['/Flames/{:03}/flame'.format(number)].value
+
+    def load(self, path, number=1):
+        """Load a flame at path"""
+        self.log.info("Loading metas for file " + path)
         with File(path, 'r') as flame:
-            version_checker(flame['Additionals'].attrs['version'])
-            self.metas.load(flame['Additionals'].attrs)
+            self._read_metas(flame, number=number)
+            self.read_inside_pts(flame, number=number)
+        self.log.info("Loaded flame named " + self.name)
+        self.log.debug(repr(self.metas.__dict__))
+        self.make_meshpoints()
+
+    def load_metas(self, path, number=1):
+        """Wrap internal _read_metas function for reading only metas"""
+        with File(path, 'r') as flame:
+            self._read_metas(flame, number=number)
+
+    def _read_metas(self, flame, number=1):
+        """Load the metas contained in an hdf group"""
+        grp = flame["/Flames/{:03}".format(number)]
+        version_checker(grp.attrs['version'])
+        self.metas.load(grp.attrs)
 

@@ -9,7 +9,7 @@ __all__ = ['GRID_SIZE',
           ]
 
 GRID_SIZE = 32
-VERSION = "1.0B1"
+VERSION = "1.1B1"
 
 #from exceptions import VersionError
 class VersionError(Exception):
