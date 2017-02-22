@@ -430,11 +430,6 @@ class Cylinder(Shape3D):
     def is_inside(self, x):
         """Determine if x is inside the cylinder"""
         axis, radius = self.project(x)
-        print x[:,0].min(), x[:,0].max()
-        print x[:,1].min(), x[:,1].max()
-        print x[:,2].min(), x[:,2].max()
-        print self.vects["xref"](), self.vects["pt_min"](), self.vects["pt_max"]()
-        print self.volume
         with open("pos.dat", "w") as f:
             f.write("# x y z axis radius\n")
             out = np.zeros((axis.size, 5))

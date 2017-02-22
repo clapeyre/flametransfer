@@ -17,6 +17,7 @@ from h5py import File
 
 from activeflame import ActiveFlame
 from constants import DEBUG
+from tools import visu
 
 class FlameDB(UserList, object):
     current = None
@@ -35,6 +36,7 @@ class FlameDB(UserList, object):
                 print " --- Exporting flame {0} with number {1}".format(flame.name, i+1)
                 flame.export_avsp(mesh, "avsp_tmp{}.sol.h5".format(i), i+1)
             shutil.copy("avsp_tmp{}.sol.h5".format(i+1), "avsp.sol.h5")
+            visu(mesh, "avsp.sol.h5")
             with File("avsp.sol.h5", 'a') as avsp:
                 for i,flame in enumerate(self.data):
                     flame.write_group(avsp, number=i+1)

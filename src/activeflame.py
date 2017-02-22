@@ -10,8 +10,9 @@ import time
 import logging
 import subprocess
 import copy
+import shutil
 
-from os.path import isfile
+from os.path import isfile, realpath, dirname, join
 from textwrap import dedent
 from tempfile import TemporaryFile
 from glob import glob
@@ -24,6 +25,7 @@ from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc,
                       ScatterShape2D, ScatterShape3D, Point, shape2json)
 from flamemetas import FlameMetas
 from constants import version_checker, DEBUG
+from tools import visu
 
 class ActiveFlame(object):
     """Flame holder class associated to a flame hdf5 file"""
@@ -50,7 +52,7 @@ class ActiveFlame(object):
     @property
     def mesh_file_hip(self):
         """Mesh file name as written by hip"""
-        return '{0}.sol.h5'.format(self.name)
+        return '{0}.mesh.h5'.format(self.name)
 
     @property
     def flame_file(self):
@@ -62,22 +64,24 @@ class ActiveFlame(object):
         """Flame file name as written by hip"""
         return '{0}.sol.h5'.format(self.name)
 
+    @property
+    def template(self):
+        return join(dirname(realpath(__file__)), "..", "template",
+                    "template{}d.mesh.h5".format(self.metas.ndim))
+
     def harmonize_flame_name(self):
         """Hip fixes the name of output file, not as we like"""
-        print "In harmonize"
         if isfile(self.mesh_file_hip):
             pass # Right now, hip writes the correct file name
         if isfile(self.flame_file_hip):
             os.rename(self.flame_file_hip, self.flame_file)
-        print self.mesh_file_hip.replace('h5', 'xmf')
-        if isfile(self.mesh_file_hip.replace('h5', 'xmf')):
-            print "We are here"
-            with open(self.mesh_file_hip.replace('h5', 'xmf')) as xmf:
-                xmf = xmf.readlines()
-            xmf = [line.replace(self.flame_file_hip, self.flame_file)
-                   for line in xmf]
-            with open(self.mesh_file_hip.replace('h5', 'xmf'), 'w') as out:
-                out.writelines(xmf)
+        #if isfile(self.mesh_file_hip.replace('h5', 'xmf')):
+        #    with open(self.mesh_file_hip.replace('h5', 'xmf')) as xmf:
+        #        xmf = xmf.readlines()
+        #    xmf = [line.replace(self.flame_file_hip, self.flame_file)
+        #           for line in xmf]
+        #    with open(self.mesh_file_hip.replace('h5', 'xmf'), 'w') as out:
+        #        out.writelines(xmf)
 
     def __getstate__(self):
         d = dict(self.__dict__)
@@ -119,11 +123,11 @@ class ActiveFlame(object):
                 else:
                     self.last_hip_output += lines
             self.last_hip_output += output.read()
-            if process.wait() != 0:
-                print "*** error in hip script. See log"
             self.log.debug("Hip execution log")
             for line in self.last_hip_output.split('\n'):
                 self.log.debug(line)
+            if process.wait() != 0:
+                raise AssertionError("error in hip script. See log")
             if DEBUG:
                 with open(path+".log", "w") as out:
                     out.write(self.last_hip_output)
@@ -253,7 +257,6 @@ class ActiveFlame(object):
 
     def _make_analytic_shape(self, shape):
         self._shape_metas(shape)
-        print self.metas.pt_min, self.metas.pt_max
         self.make_meshpoints()
         self.inside_points = 1.0*shape.is_inside(self.meshpoints)
 
@@ -261,36 +264,49 @@ class ActiveFlame(object):
         """Create and read mesh for flame
         
         Use bounding box to create box mesh containing flame geometry
-        Then read resulting meshoints"""
-        self.exec_hip(self._get_hip_script_generate())
+        """
+        assert self.metas.pt_min is not None, "Bounding box needed for mesh gen"
+        self.make_meshpoints()
+        shutil.copy(self.template, self.mesh_file)
+        with File(self.mesh_file, "a") as mesh:
+            mesh["Coordinates/x"][...] = self.meshpoints[:, 0]
+            mesh["Coordinates/y"][...] = self.meshpoints[:, 1]
+            if self.metas.ndim == 3:
+                mesh["Coordinates/z"][...] = self.meshpoints[:, 2]
+        #self.exec_hip(self._get_hip_script_generate())
         self.log.info("Wrote mesh file to " + self.mesh_file)
-        os.remove("{}.asciiBound".format(self.name))
 
     def make_meshpoints(self):
         """Store coordinates as hip writes them"""
         assert self.metas.ndim in [2, 3], "ndim must be defined"
         pt_min = self.metas.pt_min
         pt_max = self.metas.pt_max
-        points = [np.linspace(pt_min[0], pt_max[0], self.metas.grid_size),
-                  np.linspace(pt_min[1], pt_max[1], self.metas.grid_size)]
-        if self.metas.ndim == 3:
-            points.append(np.linspace(pt_min[2], pt_max[2], self.metas.grid_size))
-        out = np.array(np.meshgrid(*points)).reshape(self.metas.ndim, -1).T
-        print "XX", out[:, 0].min(), out[:, 0].max()
-        print "XX", out[:, 1].min(), out[:, 1].max()
-        print "XX", out[:, 2].min(), out[:, 2].max()
+        size = pt_max - pt_min
+        self.meshpoints = np.zeros((self.metas.grid_size**self.metas.ndim, self.metas.ndim))
+        with File(self.template, "r") as template:
+            self.meshpoints[:, 0] = pt_min[0] + template["Coordinates/x"]*size[0]
+            self.meshpoints[:, 1] = pt_min[1] + template["Coordinates/y"]*size[1]
+            if self.metas.ndim == 3:
+                self.meshpoints[:, 2] = pt_min[2] + template["Coordinates/z"]*size[2]
+        #points = [np.linspace(pt_min[0], pt_max[0], self.metas.grid_size),
+        #          np.linspace(pt_min[1], pt_max[1], self.metas.grid_size)]
+        #if self.metas.ndim == 3:
+        #    points.append(np.linspace(pt_min[2], pt_max[2], self.metas.grid_size))
+        #out = np.array(np.meshgrid(*points)).reshape(self.metas.ndim, -1).T
+        #print "XX", out[:, 0].min(), out[:, 0].max()
+        #print "XX", out[:, 1].min(), out[:, 1].max()
+        #print "XX", out[:, 2].min(), out[:, 2].max()
         #self.meshpoints = np.roll(out, 1, axis=1)  -> Why was that necessary??
-        self.meshpoints = out
-        print "YY", self.meshpoints[:, 0].min(), self.meshpoints[:, 0].max()
-        print "YY", self.meshpoints[:, 1].min(), self.meshpoints[:, 1].max()
-        print "YY", self.meshpoints[:, 2].min(), self.meshpoints[:, 2].max()
+        #self.meshpoints = out
+        #print "YY", self.meshpoints[:, 0].min(), self.meshpoints[:, 0].max()
+        #print "YY", self.meshpoints[:, 1].min(), self.meshpoints[:, 1].max()
+        #print "YY", self.meshpoints[:, 2].min(), self.meshpoints[:, 2].max()
         #out[:, [0, 1, 2]] = out[:, [2, 0, 1]]  -> Works but only for 3d
         #np.savetxt("mshpts_gene.dat", self.meshpoints)
         self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:, 0].size))
 
     def _get_hip_script_generate(self):
         """Write hip script for mesh generation"""
-        assert self.metas.pt_min is not None, "Bounding box needed for mesh gen"
         line_3d = (
                 "co 3d {0[2]} {1[2]} {2} z".format(self.metas.pt_min,
                                                    self.metas.pt_max,
@@ -360,7 +376,7 @@ class ActiveFlame(object):
         return dedent("""\
           se ch 0
           se in-recoType flag
-          se in-rim 1.1
+          se in-rim 0.1
           re hd -a {0} -s {1}
           re hd -a {2} -s {3}
           in gr 1
@@ -385,11 +401,14 @@ class ActiveFlame(object):
         """Write mesh, flame and xmf file"""
         self.make_mesh()
         self.write_h5()
-        script = ["re hd -a {0.mesh_file} -s {0.flame_file}".format(self),
-                  "wr hd {0.name}".format(self)]
-        self.exec_hip("\n".join(script))
-        self.harmonize_flame_name()
-        self.write_h5()
+        output = visu(self.mesh_file, self.flame_file)
+        for line in output.split('\n'):
+            self.log.debug("VISU: " + line)
+        #script = ["re hd -a {0.mesh_file} -s {0.flame_file}".format(self),
+        #          "wr hd {0.name}".format(self)]
+        #self.exec_hip("\n".join(script))
+        #self.harmonize_flame_name()
+        #self.write_h5()
 
     def write_group(self, hdf_obj, number=1):
         """Write full flame in /Flames/00X of hdf file"""
