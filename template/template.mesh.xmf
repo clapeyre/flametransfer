@@ -1,0 +1,175 @@
+<?xml version="1.0" ?>
+<Xdmf xmlns:xi="http://www.w3.org/2003/XInclude" Version="2.0">
+  <Domain>
+    <Grid Collection="Hexahedron_Mesh" Name="Hexahedron">
+    <Topology Type="Hexahedron" NumberOfElements="29791">
+      <DataItem ItemType="Function" Dimensions="238328" Function="$0 - 1">
+        <DataItem Format="HDF" DataType="Int" Dimensions="238328">
+        ./template.mesh.h5:/Connectivity/hex->node
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y_Z">
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/y
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/z
+        </DataItem>
+    </Geometry>
+  </Grid>
+  <Grid Collection="./template.mesh.h5" Name="bottom_y_eq_0">
+    <Topology Type="Quadrilateral" NumberOfElements="961">
+      <DataItem ItemType="Function" Dimensions="3844" Function="$0 - 1">
+        <DataItem ItemType="Hyperslab" Dimensions="3844" Type="HyperSlab" >
+          <DataItem Dimensions="3" Format="XML">
+          0 1 3844
+          </DataItem>
+          <DataItem Format="HDF" DataType="Int" Dimensions="23064">
+          ./template.mesh.h5:/Boundary/bnd_qua->node
+          </DataItem>
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y_Z">
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/y
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/z
+        </DataItem>
+    </Geometry>
+ </Grid>
+  <Grid Collection="./template.mesh.h5" Name="right_x_eq_1">
+    <Topology Type="Quadrilateral" NumberOfElements="961">
+      <DataItem ItemType="Function" Dimensions="3844" Function="$0 - 1">
+        <DataItem ItemType="Hyperslab" Dimensions="3844" Type="HyperSlab" >
+          <DataItem Dimensions="3" Format="XML">
+          3844 1 3844
+          </DataItem>
+          <DataItem Format="HDF" DataType="Int" Dimensions="23064">
+          ./template.mesh.h5:/Boundary/bnd_qua->node
+          </DataItem>
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y_Z">
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/y
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/z
+        </DataItem>
+    </Geometry>
+ </Grid>
+  <Grid Collection="./template.mesh.h5" Name="top_y_eq_1">
+    <Topology Type="Quadrilateral" NumberOfElements="961">
+      <DataItem ItemType="Function" Dimensions="3844" Function="$0 - 1">
+        <DataItem ItemType="Hyperslab" Dimensions="3844" Type="HyperSlab" >
+          <DataItem Dimensions="3" Format="XML">
+          7688 1 3844
+          </DataItem>
+          <DataItem Format="HDF" DataType="Int" Dimensions="23064">
+          ./template.mesh.h5:/Boundary/bnd_qua->node
+          </DataItem>
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y_Z">
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/y
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/z
+        </DataItem>
+    </Geometry>
+ </Grid>
+  <Grid Collection="./template.mesh.h5" Name="left_x_eq_0">
+    <Topology Type="Quadrilateral" NumberOfElements="961">
+      <DataItem ItemType="Function" Dimensions="3844" Function="$0 - 1">
+        <DataItem ItemType="Hyperslab" Dimensions="3844" Type="HyperSlab" >
+          <DataItem Dimensions="3" Format="XML">
+          11532 1 3844
+          </DataItem>
+          <DataItem Format="HDF" DataType="Int" Dimensions="23064">
+          ./template.mesh.h5:/Boundary/bnd_qua->node
+          </DataItem>
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y_Z">
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/y
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/z
+        </DataItem>
+    </Geometry>
+ </Grid>
+  <Grid Collection="./template.mesh.h5" Name="first_slice_at_z_eq_0">
+    <Topology Type="Quadrilateral" NumberOfElements="961">
+      <DataItem ItemType="Function" Dimensions="3844" Function="$0 - 1">
+        <DataItem ItemType="Hyperslab" Dimensions="3844" Type="HyperSlab" >
+          <DataItem Dimensions="3" Format="XML">
+          15376 1 3844
+          </DataItem>
+          <DataItem Format="HDF" DataType="Int" Dimensions="23064">
+          ./template.mesh.h5:/Boundary/bnd_qua->node
+          </DataItem>
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y_Z">
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/y
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/z
+        </DataItem>
+    </Geometry>
+ </Grid>
+  <Grid Collection="./template.mesh.h5" Name="last_slice_at_z_eq_1">
+    <Topology Type="Quadrilateral" NumberOfElements="961">
+      <DataItem ItemType="Function" Dimensions="3844" Function="$0 - 1">
+        <DataItem ItemType="Hyperslab" Dimensions="3844" Type="HyperSlab" >
+          <DataItem Dimensions="3" Format="XML">
+          19220 1 3844
+          </DataItem>
+          <DataItem Format="HDF" DataType="Int" Dimensions="23064">
+          ./template.mesh.h5:/Boundary/bnd_qua->node
+          </DataItem>
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y_Z">
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/y
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="32768">
+        ./template.mesh.h5:/Coordinates/z
+        </DataItem>
+    </Geometry>
+ </Grid>
+  </Domain>
+</Xdmf>

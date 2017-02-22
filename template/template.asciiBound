@@ -1,0 +1,27 @@
+  Grid processing by hip version 17.03, 'Jasminum nudiflorum'.
+  6 boundary patches.
+---------------------------------------------
+  Patch: 1
+  bottom_y_eq_0
+  NO_BOUNDARY
+---------------------------------------------
+  Patch: 2
+  right_x_eq_1
+  NO_BOUNDARY
+---------------------------------------------
+  Patch: 3
+  top_y_eq_1
+  NO_BOUNDARY
+---------------------------------------------
+  Patch: 4
+  left_x_eq_0
+  NO_BOUNDARY
+---------------------------------------------
+  Patch: 5
+  first_slice_at_z_eq_0
+  NO_BOUNDARY
+---------------------------------------------
+  Patch: 6
+  last_slice_at_z_eq_1
+  NO_BOUNDARY
+---------------------------------------------
