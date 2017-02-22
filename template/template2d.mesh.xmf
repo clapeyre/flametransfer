@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<Xdmf xmlns:xi="http://www.w3.org/2003/XInclude" Version="2.0">
+  <Domain>
+    <Grid Collection="Quadrilateral_Mesh" Name="Quadrilateral">
+    <Topology Type="Quadrilateral" NumberOfElements="961">
+      <DataItem ItemType="Function" Dimensions="3844" Function="$0 - 1">
+        <DataItem Format="HDF" DataType="Int" Dimensions="3844">
+        ./template2d.mesh.h5:/Connectivity/qua->node
+        </DataItem>
+      </DataItem>
+    </Topology>
+    <Geometry Type="X_Y">
+        <DataItem Format="HDF" DataType="Float" Dimensions="1024">
+        ./template2d.mesh.h5:/Coordinates/x
+        </DataItem>
+        <DataItem Format="HDF" DataType="Float" Dimensions="1024">
+        ./template2d.mesh.h5:/Coordinates/y
+        </DataItem>
+    </Geometry>
+  </Grid>
+  </Domain>
+</Xdmf>
