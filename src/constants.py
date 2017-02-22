@@ -8,8 +8,11 @@ __all__ = ['GRID_SIZE',
            'VERSION',
           ]
 
+import os
+
 GRID_SIZE = 32
 VERSION = "1.1B1"
+DEBUG = True if "DEBUG" in os.environ.keys() else False
 
 #from exceptions import VersionError
 class VersionError(Exception):

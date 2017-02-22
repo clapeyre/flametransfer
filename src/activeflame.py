@@ -23,9 +23,7 @@ from h5py import File
 from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc,
                       ScatterShape2D, ScatterShape3D, Point, shape2json)
 from flamemetas import FlameMetas
-from constants import version_checker
-
-DEBUG = False
+from constants import version_checker, DEBUG
 
 class ActiveFlame(object):
     """Flame holder class associated to a flame hdf5 file"""
@@ -94,10 +92,12 @@ class ActiveFlame(object):
         """Execute the current hip script."""
         script += "\nqu\n"
         def next_script():
+            scripts = glob("script_*.hip")
             if DEBUG:
-                scripts = glob("script_*.hip")
                 return "script_{:03}.hip".format(len(scripts)+1)
             else:
+                [os.remove(s) for s in scripts]
+                [os.remove(s+".log") for s in scripts]
                 return "script.hip"
         path = next_script()
         self.last_hip_output = ""
@@ -163,9 +163,9 @@ class ActiveFlame(object):
             def find_field(name):
                 if field.lower() in name.lower(): return name
             selected_field = sol.visit(find_field)
-            if selected_field is None:
-                print "*** no field containing {0} found in {1}".format(field, avbp_sol)
-                return
+            assert selected_field is not None, (
+                    "no field containing {0} found in {1}"
+                    .format(field, avbp_sol))
             data = sol[sol.visit(find_field)].value
             above = data > np.float(thresh)
             x = mesh["Coordinates/x"].value
@@ -191,14 +191,14 @@ class ActiveFlame(object):
             flame['/Average/flames'] = 1.0*above
             flame.create_group("/Parameters")
             flame['/Parameters/ndim'] = np.array([self.metas.ndim])
-            flame['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            flame['/Parameters/nnode'] = np.array([self.meshpoints.shape[0]])
             flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
         with File("dummy_flametrans.h5", 'w') as flame:
             flame.create_group("/Average")
             flame['/Average/flames'] = 0.0*above
             flame.create_group("/Parameters")
             flame['/Parameters/ndim'] = np.array([self.metas.ndim])
-            flame['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            flame['/Parameters/nnode'] = np.array([self.meshpoints.shape[0]])
             flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
         script = [
                 "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
@@ -253,6 +253,7 @@ class ActiveFlame(object):
 
     def _make_analytic_shape(self, shape):
         self._shape_metas(shape)
+        print self.metas.pt_min, self.metas.pt_max
         self.make_meshpoints()
         self.inside_points = 1.0*shape.is_inside(self.meshpoints)
 
@@ -275,7 +276,14 @@ class ActiveFlame(object):
         if self.metas.ndim == 3:
             points.append(np.linspace(pt_min[2], pt_max[2], self.metas.grid_size))
         out = np.array(np.meshgrid(*points)).reshape(self.metas.ndim, -1).T
-        self.meshpoints = np.roll(out, 1, axis=1)
+        print "XX", out[:, 0].min(), out[:, 0].max()
+        print "XX", out[:, 1].min(), out[:, 1].max()
+        print "XX", out[:, 2].min(), out[:, 2].max()
+        #self.meshpoints = np.roll(out, 1, axis=1)  -> Why was that necessary??
+        self.meshpoints = out
+        print "YY", self.meshpoints[:, 0].min(), self.meshpoints[:, 0].max()
+        print "YY", self.meshpoints[:, 1].min(), self.meshpoints[:, 1].max()
+        print "YY", self.meshpoints[:, 2].min(), self.meshpoints[:, 2].max()
         #out[:, [0, 1, 2]] = out[:, [2, 0, 1]]  -> Works but only for 3d
         #np.savetxt("mshpts_gene.dat", self.meshpoints)
         self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:, 0].size))
@@ -340,32 +348,36 @@ class ActiveFlame(object):
     def export_avsp(self, avsp_mesh, avsp_sol, number):
         """Export flame to AVSP solution"""
         self.make_mesh()
-        self.write_h5(number=number)
+        name = "flame_{}.h5".format(number)
+        self.write_h5(number=number, name=name)
         #with File("avsp.sol.h5", "r") as f: print f["Average/flames"].value
-        self.exec_hip(self._get_expavsp_hip_script(avsp_mesh, avsp_sol))
-        self.write_h5() # Rewrite flame with values between 0 and 1
+        self.exec_hip(self._get_expavsp_hip_script(self.mesh_file, name,
+                                                   avsp_mesh, avsp_sol, number))
+        if not DEBUG: os.remove(name)
 
-    def _get_expavsp_hip_script(self, avsp_mesh, avsp_sol):
+    def _get_expavsp_hip_script(self, src_mesh, src_sol, avsp_mesh, avsp_sol, number):
         """Generate hip script for flame interpolation on AVSP mesh"""
         return dedent("""\
           se ch 0
-          se in-rim 0.9
-          re hd -a {0.mesh_file} -s {0.flame_file}
-          re hd -a {1} -s {2}
+          se in-recoType flag
+          se in-rim 1.1
+          re hd -a {0} -s {1}
+          re hd -a {2} -s {3}
           in gr 1
-          wr hd -a avsp
-          """).format(self, avsp_mesh, avsp_sol)
+          wr hd -a avsp_tmp{4}
+          """).format(src_mesh, src_sol, avsp_mesh, avsp_sol, number)
 
-    def write_h5(self, number=1):
+    def write_h5(self, number=1, name=None):
         """Write h5 file for flame"""
         assert self.meshpoints is not None, "Flame not read/generated yet"
-        with File(self.flame_file, 'w') as flame:
+        name = name if name is not None else self.flame_file
+        with File(name, 'w') as flame:
             flame.create_group("/Average")
             flame['/Average/flames'] = np.where(self.inside_points>0.1, float(number), 0.)
             self.write_group(flame, number=number)
             flame.create_group("/Parameters")
             flame['/Parameters/ndim'] = np.array([self.metas.ndim])
-            flame['/Parameters/nnode'] = np.array([self.meshpoints.size])
+            flame['/Parameters/nnode'] = np.array([self.meshpoints.shape[0]])
             flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
             self.log.info("Wrote flame file to " + self.flame_file)
 

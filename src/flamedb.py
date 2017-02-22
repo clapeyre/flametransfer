@@ -8,6 +8,7 @@ Created Jan 2017 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 import os
 import shutil
 
+from glob import glob
 from UserList import UserList
 
 import numpy as np
@@ -15,6 +16,7 @@ import numpy as np
 from h5py import File
 
 from activeflame import ActiveFlame
+from constants import DEBUG
 
 class FlameDB(UserList, object):
     current = None
@@ -32,11 +34,11 @@ class FlameDB(UserList, object):
             for i,flame in enumerate(self.data):
                 print " --- Exporting flame {0} with number {1}".format(flame.name, i+1)
                 flame.export_avsp(mesh, "avsp_tmp{}.sol.h5".format(i), i+1)
-                os.rename("avsp.sol.h5", "avsp_tmp{}.sol.h5".format(i+1))
-            os.rename("avsp_tmp{}.sol.h5".format(i+1), "avsp.sol.h5")
+            shutil.copy("avsp_tmp{}.sol.h5".format(i+1), "avsp.sol.h5")
             with File("avsp.sol.h5", 'a') as avsp:
                 for i,flame in enumerate(self.data):
                     flame.write_group(avsp, number=i+1)
+            if not DEBUG: [os.remove(fil) for fil in glob("avsp_tmp*")]
         else:
             raise AssertionError("Unknown target " + target)
 
