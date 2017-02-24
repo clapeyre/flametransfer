@@ -363,7 +363,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         if switch == "c": # current
             assert len(args) == 2, "invalid number of arguments"
             fla_nb, flame = self._flame_finder(args[1])
-            self.flames.current = self.flames[fla_nb-1]
+            self.flames.current = self.flames[fla_nb]
         elif switch in "sm": # static meta | mutable meta
             assert len(args) == 3, "invalid number of arguments"
             name, typ = args[1:]
@@ -412,7 +412,6 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
             assert len(args) == 3, "invalid number of arguments"
             nb1, fl1 = self._flame_finder(args[1])
             nb2, fl2 = self._flame_finder(args[2])
-            print nb1, nb2
             self.flames[nb1] = fl2
             self.flames[nb2] = fl1
         else:
@@ -503,7 +502,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         assert dest not in [flame.name for flame in self.flames], (
                 "{} is already a declared flame".format(dest))
         fla_nb, flame = self._flame_finder(src)
-        self.flames.append(copy.deepcopy(self.flames[fla_nb-1]))
+        self.flames.append(copy.deepcopy(self.flames[fla_nb]))
         self.flames[-1].metas.name = dest
         self.flames.current = self.flames[-1]
 
