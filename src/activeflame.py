@@ -376,7 +376,7 @@ class ActiveFlame(object):
         return dedent("""\
           se ch 0
           se in-recoType flag
-          se in-rim 0.1
+          se in-rim 0
           re hd -a {0} -s {1}
           re hd -a {2} -s {3}
           in gr 1
