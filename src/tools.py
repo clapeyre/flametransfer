@@ -17,7 +17,6 @@ def visu(mesh, sol):
                                    stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        print "Process started"
         output, err = process.communicate()
         #while process.wait(): time.sleep(0.01)
         return output
