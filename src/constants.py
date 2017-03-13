@@ -11,7 +11,7 @@ __all__ = ['GRID_SIZE',
 import os
 
 GRID_SIZE = 32
-VERSION = "1.1B1"
+VERSION = "1.1.0-alpha"
 DEBUG = True if "DEBUG" in os.environ.keys() else False
 
 #from exceptions import VersionError
