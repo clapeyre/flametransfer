@@ -54,9 +54,7 @@ class FlameTransferProcess(LibProcess):
     def _rename(self, src_name, dest_name):
         """Specific implementation of flame renaming"""
         script = ["read " + self.libobj_file(src_name),
-                  "set static",
-                  "name",
-                  "st",
+                  "set static name string",
                   dest_name,
                   "write flame"
                   ]
@@ -79,9 +77,7 @@ class FlameTransferProcess(LibProcess):
     def duplicate_libobj(self, name):
         """Specific implementation of object duplication"""
         script = ["read " + self.libobj_file(name),
-                  "set static",
-                  "name",
-                  "st",
+                  "set static name string",
                   name + '_duplicate',
                   "wr fl"
                   ]
