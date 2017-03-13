@@ -439,7 +439,9 @@ class ActiveFlame(object):
             self._read_metas(flame, number=number)
             self.read_inside_pts(flame, number=number)
         self.log.info("Loaded flame named " + self.name)
-        self.log.debug(repr(self.metas.__dict__))
+        self.log.debug("Contents :\n" + "\n".join(
+                "{0}: {1}".format(k, v)
+                for k, v in self.metas.__dict__.items()))
         self.make_meshpoints()
 
     def load_metas(self, path, number=1):
