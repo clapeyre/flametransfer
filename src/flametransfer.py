@@ -320,10 +320,10 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                     k, v() if v is not None else None).replace('\n', ' ') + '\n')
         elif arg == "j": # json formatted output
             try:
-                with open("{}.metas.json".format(
-                              self.flames.current.metas.name),
-                          'w') as f:
-                    self.flames.current.metas.write_json(f)
+                for flame in self.flames:
+                    with open("{}.metas.json".format(flame.metas.name),
+                              'w') as f:
+                        flame.metas.write_json(f)
             except ImportError:
                 raise AssertionError("could not import python module json")
         elif arg == "d": # dump
@@ -492,6 +492,10 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 > re(ad) <path> [metas_only]
                 |  <path>       : absolute or relative path to flame .h5 file
                 |  [metas_only] : only read the flame's metas. Faster, but incomplete""")
+
+    def complete_read(self, text, line, begidx, endidx):
+        candidates = [f for f in os.listdir('.') if f[-9:] == ".flame.h5"]
+        return [f for f in candidates if f.startswith(text)]
 
     def do_copy(self, s):
         assert len(self.flames) > 0, "no flames defined yet"
