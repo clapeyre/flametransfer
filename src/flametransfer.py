@@ -25,10 +25,11 @@ from StringIO import StringIO
 
 import numpy as np
 
+from constants import VERSION, DEBUG
+from hip_wrapper import HipWrapper
 from activeflame import ActiveFlame
-from geometry import NormalVector, Vector, Point
-from constants import VERSION
 from flamedb import FlameDB
+from geometry import NormalVector, Vector, Point
 
 logger = logging.getLogger()
 logger.setLevel("DEBUG")
@@ -158,22 +159,21 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     """Command line interpreter for flame transfer"""
     log = logging.getLogger(__name__)
     try:
-        hip_exec = os.environ['HIP_EXEC']
+        hip_wrapper = HipWrapper(os.environ['HIP_EXEC'])
     except KeyError:
         print "ERROR: Please define the HIP_EXEC environment variable"
         sys.exit()
-
     intro = dedent("""\
             Welcome to the FlameTransfer V.{} command line
             Type help or ? for a list of commands,
                  ?about for more on this app""").format(VERSION)
-
     prompt = "ft > "
-    flames = FlameDB()
+    flames = FlameDB(hip_wrapper)
 
     def precmd(self, line):
         """Reprint the line to know what is executed"""
-        #print "\n >>> executing: ", line
+        if DEBUG:
+            print "\n >>> executing: ", line
         return line
 
     def help_about(self):
@@ -220,28 +220,28 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         if typ == "d": # disc
             center = input_floats(self.read('Disk center (x y) : '))
             radius = input_floats(self.read('Disk radius (r)   : '))[0]
-            self.flames.current = ActiveFlame(name, self.hip_exec)
+            self.flames.current = ActiveFlame(name, self.hip_wrapper)
             self.flames.current.define_flame_disc(center, radius)
         elif typ == "r": # rectangle
             pt_min = input_floats(self.read('Min point  (x y) : '))
             pt_max = input_floats(self.read('Max point  (x y) : '))
-            self.flames.current = ActiveFlame(name, self.hip_exec)
+            self.flames.current = ActiveFlame(name, self.hip_wrapper)
             self.flames.current.define_flame_rectangle(pt_min, pt_max)
         elif typ == "b": # brick
             pt_min = input_floats(self.read('Min point  (x y z) : '))
             pt_max = input_floats(self.read('Max point  (x y z) : '))
-            self.flames.current = ActiveFlame(name, self.hip_exec)
+            self.flames.current = ActiveFlame(name, self.hip_wrapper)
             self.flames.current.define_flame_brick(pt_min, pt_max)
         elif typ == "s": # sphere
             center = input_floats(self.read('Sphere center (x y z) : '))
             radius = input_floats(self.read('Sphere radius (r)     : '))
-            self.flames.current = ActiveFlame(name, self.hip_exec)
+            self.flames.current = ActiveFlame(name, self.hip_wrapper)
             self.flames.current.define_flame_sphere(center, radius)
         elif typ == "c": # cylinder
             center = input_floats(self.read('Cylinder center (x y z) : '))
             radius = input_floats(self.read('Cylinder radius (r)     : '))
             vector = input_floats(self.read('Cylinder vector (x y z) : '))
-            self.flames.current = ActiveFlame(name, self.hip_exec)
+            self.flames.current = ActiveFlame(name, self.hip_wrapper)
             self.flames.current.define_flame_cylinder(center, radius, vector)
         elif typ == "a": # avbp field
             avbp_mesh = self.read('AVBP mesh : ')
@@ -250,7 +250,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
             assert isfile(avbp_sol); "not such file"
             avbp_field = self.read('Scalar field : ')
             avbp_thresh = self.read('Threshold value : ')
-            self.flames.current = ActiveFlame(name, self.hip_exec)
+            self.flames.current = ActiveFlame(name, self.hip_wrapper)
             self.flames.current.define_threshold_flame(
                     avbp_mesh, avbp_sol, avbp_field, avbp_thresh)
         else:
@@ -479,7 +479,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         args = s.split()
         assert len(args) in [1, 2], "invalid number of arguments"
         assert isfile(args[0]), "no such file"
-        flame = ActiveFlame('tmp', self.hip_exec)
+        flame = ActiveFlame('tmp', self.hip_wrapper)
         if args[-1][0] == "m":
             flame.load_metas(args[0])
         else:
@@ -544,40 +544,46 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     def complete_transform(self, text, line, begidx, endidx):
         return [f for f in self.transforms if f.startswith(text)]
 
-    exports = "AVSP5.6".split()
+    exports = "AVSP6X".split()
     def do_export(self, s):
         """Export current flame"""
         assert len(self.flames) > 0, "no flames defined yet"
-        if s.lower() == "avsp5.6":
+        if s.lower() == "avsp6x":
             avsp_mesh = self.read('AVSP mesh file : ')
             avsp_sol = self.read('AVSP sol file : ')
-            self.flames.export(avsp_mesh, avsp_sol, "avsp5.6")
+            self.flames.export_avsp6x(avsp_mesh, avsp_sol)
         else:
             raise AssertionError("unknown export format")
 
     def help_export(self):
         print dedent("""\
                 Export all flames to another format
-                > export AVSP5.6
-                |  variable frequency n-tau - multi-flame AVSP version""")
+                > export AVSP6X
+                |  variable frequency n-tau - multi-flame""")
 
     def complete_export(self, text, line, begidx, endidx):
         return [f for f in self.exports if f.startswith(text)]
 
-    imports = "AVSP5.6".split()
+    imports = "AVSP5X AVSP6X".split()
     def do_import(self, s):
         """Import flames from other format"""
-        if s.lower() == "avsp5.6":
+        if s.lower() == "avsp5x":
+            avsp_mesh = self.read('AVSP mesh file : ')
             avsp_sol = self.read('AVSP sol file : ')
-            self.flames.import_flames(avsp_sol, "avsp5.6", self.hip_exec)
+            self.flames.import_avsp5x(avsp_mesh, avsp_sol)
+        if s.lower() == "avsp6x":
+            avsp_sol = self.read('AVSP sol file : ')
+            self.flames.import_avsp6x(avsp_sol)
         else:
             raise AssertionError("unknown import format")
 
     def help_import(self):
         print dedent("""\
                 Import all flames from another format
-                > import AVSP5.6
-                |  variable frequency n-tau - multi-flame AVSP version""")
+                > import AVSP5X
+                |  single frequency - 1 type multi-flame
+                > import AVSP6X
+                |  variable frequency n-tau - multi-flame""")
 
     def do_echo(self, s):
         """Print something on the command line. For batch debugging"""

@@ -6,16 +6,12 @@ Handle Read / Write of H5 Flame files.
 Created November 2016 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
 import os
-import time
 import logging
-import subprocess
 import copy
 import shutil
 
 from os.path import isfile, realpath, dirname, join
 from textwrap import dedent
-from tempfile import TemporaryFile
-from glob import glob
 
 import numpy as np
 
@@ -24,20 +20,26 @@ from h5py import File
 from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc,
                       ScatterShape2D, ScatterShape3D, Point, shape2json)
 from flamemetas import FlameMetas
+from hip_wrapper import HipWrapper
 from constants import version_checker, DEBUG
 from tools import visu
 
 class ActiveFlame(object):
     """Flame holder class associated to a flame hdf5 file"""
-    def __init__(self, name, hip_exec, **kwargs):
+    def __init__(self, name, hip_wrapper, **kwargs):
         self.log = logging.getLogger(__name__)
         self.meshpoints = None
         self.inside_points = None
         self.shape = None
         self.metas = FlameMetas(name=name)
-        self.hip_exec = hip_exec
-        self.last_hip_output = ""
+        self.hip_wrapper = hip_wrapper
         self.__dict__.update(kwargs)
+
+    def __deepcopy__(self, memo):
+        newone = type(self)(self.name, self.hip_wrapper)
+        newone.__dict__.update(self.__dict__)
+        newone.metas = copy.deepcopy(self.metas, memo)
+        return newone
 
     @property
     def name(self):
@@ -91,47 +93,6 @@ class ActiveFlame(object):
     def __setstate__(self, d):
         self.__dict__.update(d)
         self.log = logging.getLogger(__name__)
-
-    def exec_hip(self, script):
-        """Execute the current hip script."""
-        script += "\nqu\n"
-        def next_script():
-            scripts = glob("script_*.hip")
-            if DEBUG:
-                return "script_{:03}.hip".format(len(scripts)+1)
-            else:
-                [os.remove(s) for s in scripts]
-                [os.remove(s+".log") for s in scripts]
-                return "script.hip"
-        path = next_script()
-        self.last_hip_output = ""
-        self.log.debug("Executing hip script:")
-        [self.log.debug(" > " + line) for line in script.split('\n')]
-        with open(path, 'w') as scr:
-            scr.write(script)
-        with TemporaryFile() as output:
-            process = subprocess.Popen([self.hip_exec, path],
-                                       stdin=subprocess.PIPE,
-                                       stdout=output,
-                                       stderr=subprocess.STDOUT)
-            while process.poll() is None:
-                where = output.tell()
-                lines = output.read()
-                if not lines:
-                    time.sleep(0.1)
-                    output.seek(where)
-                else:
-                    self.last_hip_output += lines
-            self.last_hip_output += output.read()
-            self.log.debug("Hip execution log")
-            for line in self.last_hip_output.split('\n'):
-                self.log.debug(line)
-            if process.wait() != 0:
-                raise AssertionError("error in hip script. See log")
-            if DEBUG:
-                with open(path+".log", "w") as out:
-                    out.write(self.last_hip_output)
-        print "\n --- Done executing hip"
 
     def compute_n_crocco(self, n1, area, p_mean, gamma):
         """Define gain (N2) using Crocco's analytical formulation"""
@@ -212,7 +173,7 @@ class ActiveFlame(object):
                 "wr hd dummy_flame",
                 "qu",
                 ]
-        self.exec_hip('\n'.join(script))
+        self.hip_wrapper.execute('\n'.join(script))
         with File("dummy_flame.sol.h5", 'r') as flame:
             self.inside_points = flame["/Average/flames"].value
         if not DEBUG:
@@ -329,7 +290,7 @@ class ActiveFlame(object):
           tr ro {1} {2}
           wr hd ./{3}
           """.format(self, axis, angle, self.name))
-        self.exec_hip(rotate_script)
+        self.hip_wrapper.execute(rotate_script)
         self.harmonize_flame_name()
 
         with File(self.flame_file, 'r') as flame:
@@ -342,7 +303,7 @@ class ActiveFlame(object):
         interp_script = ["re hd -a {0.mesh_file} -s {0.flame_file}".format(self)]
         interp_script += self._get_hip_script_generate().split("\n")
         interp_script.insert(3, "in gr 1")
-        self.exec_hip('\n'.join(interp_script))
+        self.hip_wrapper.execute('\n'.join(interp_script))
         self.harmonize_flame_name()
 
     def export_avsp(self, avsp_mesh, avsp_sol, number):
@@ -351,8 +312,8 @@ class ActiveFlame(object):
         name = "flame_{}.h5".format(number)
         self.write_h5(number=number, name=name)
         #with File("avsp.sol.h5", "r") as f: print f["Average/flames"].value
-        self.exec_hip(self._get_expavsp_hip_script(self.mesh_file, name,
-                                                   avsp_mesh, avsp_sol, number))
+        self.hip_wrapper.execute(self._get_expavsp_hip_script(
+            self.mesh_file, name, avsp_mesh, avsp_sol, number))
         if not DEBUG: os.remove(name)
 
     def _get_expavsp_hip_script(self, src_mesh, src_sol, avsp_mesh, avsp_sol, number):
@@ -408,7 +369,7 @@ class ActiveFlame(object):
         self.metas.load(grp.attrs)
 
     def read_inside_pts(self, hdf_obj, number=1):
-        """Read inside points in /Flames/00X of hdf file"""
+        """Read inside points in /Flames/number of hdf file"""
         self.inside_points = hdf_obj['/Flames/{:03}/flame'.format(number)].value
 
     def load(self, path, number=1):
