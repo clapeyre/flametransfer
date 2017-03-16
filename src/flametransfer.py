@@ -18,11 +18,12 @@ import logging
 import sys
 import cmd
 import copy
-import numpy as np
 
 from os.path import isfile
 from textwrap import dedent
 from StringIO import StringIO
+
+import numpy as np
 
 from activeflame import ActiveFlame
 from geometry import NormalVector, Vector, Point
@@ -61,7 +62,7 @@ class ShellCmd(cmd.Cmd, object):
 
     def help_shell(self):
         print dedent("""\
-                Execute a regular shell command. 
+                Execute a regular shell command.
                 Useful for e.g. 'shell ls' (to see what has been written).
                 Note : '!ls' is equivalent to 'shell ls'.
                 Warning : Your .bashrc file is *not* sourced.""")
@@ -70,7 +71,7 @@ class ShellCmd(cmd.Cmd, object):
 
 class SmartCmd(cmd.Cmd, object):
     """Good featured command line
-    
+
     - function / help shortcuts (as short as disambiguation permits)
     - catch ^C
     - catch assertion errors
@@ -116,7 +117,7 @@ class SmartCmd(cmd.Cmd, object):
                 return
             else:
                 arg = helper[0]
-        cmd.Cmd.do_help(self, arg) 
+        cmd.Cmd.do_help(self, arg)
 
     def onecmd(self, line):
         """Wrapper for cmd.Cmd.onecmd to catch assertion errors"""
@@ -180,7 +181,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 --------------------------------
                 Welcome to the FlameTransfer App
                 --------------------------------
-                
+
                 This app is meant for the import / export and manipulation of
                 hdf5 flame files, representing an active flame.  Parameters
                 needed for acoustic computations are stored, such as flame
@@ -193,15 +194,15 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 does not lead to ambiguity (2 is often good, 3 should be very
                 safe). Everything is parsed based on whitespaces, so a vector
                 is simply:
-                
+
                 Please input vector : 1 0 0
-                
+
                 This implies that 'my new flame' will not work as a flame name.
                 Also, tab completion works, including after a command:
 
                 ft > gen<tab>
                 ft > generate <tab>
-                avbp_field     disc         cylinder         sphere 
+                avbp_field     disc         cylinder         sphere
 
                 Awesome, right?
                 """)
@@ -259,13 +260,13 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     def help_generate(self):
         print dedent("""\
                 Generate an analytical flame shape. All lenths are in [m]
-                > ge(nerate) <shape> <name> 
+                > ge(nerate) <shape> <name>
                 |  <shape> : one of {}
                 |  <name>  : careful, same name flame is overwritten""".format(
                   ", ".join(self.generators)))
 
     def complete_generate(self, text, line, begidx, endidx):
-        return [ f for f in self.generators if f.startswith(text) ]
+        return [f for f in self.generators if f.startswith(text)]
 
     writers = "mesh flame full".split()
     def do_write(self, s):
@@ -290,7 +291,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 |  full  : write hdf5 mesh, flame and matching xmf file""")
 
     def complete_write(self, text, line, begidx, endidx):
-        return [ f for f in self.writers if f.startswith(text) ]
+        return [f for f in self.writers if f.startswith(text)]
 
     listers = "flames refs metas json dump".split()
     def do_list(self, s):
@@ -352,7 +353,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 |   <key>    : input a key, get the resulting meta value in a '<key>' file""")
 
     def complete_list(self, text, line, begidx, endidx):
-        return [ f for f in self.listers if f.startswith(text) ]
+        return [f for f in self.listers if f.startswith(text)]
 
     setters = "current meta refs ntau static vector ".split()
     def do_set(self, s):
@@ -439,18 +440,18 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 |  Swap 2 flames in list (by number or name)""")
 
     def complete_set(self, text, line, begidx, endidx):
-        return [ f for f in self.setters if f.startswith(text) ]
+        return [f for f in self.setters if f.startswith(text)]
 
     def help_N_tau(self):
         print dedent("""
                 ----------
                 N-tau data
                 ----------
-                
+
                 In AVSP 5.6 and above, N-tau data is frequency dependant.
                 Input files are column tab/space separated ascii files, and
                 each line contains:
-                 
+
                 freq N tau
 
                 '#' is the comment character, so feel free to add comments to
@@ -459,15 +460,15 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
 
                 AVSP then interpolates linearly in this table.  First and
                 last values are kept constant:
-                |         .___. 
+                |         .___.
                 |       ./     \.___
-                |  ___./  
+                |  ___./
                 Example: if this is my data file :
-                
+
                 # My great data
                 100 1.1 0.001
                 500 0.9 0.003  # Not sure about the delay
-                
+
                 then AVSP will compute for the following :
                 | 50 Hz: N=1.1, tau=0.001
                 |300 Hz: N=1.0, tau=0.002
@@ -541,7 +542,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 > transform translate|scale|rotate""")
 
     def complete_transform(self, text, line, begidx, endidx):
-        return [ f for f in self.transforms if f.startswith(text) ]
+        return [f for f in self.transforms if f.startswith(text)]
 
     exports = "AVSP5.6".split()
     def do_export(self, s):
@@ -561,7 +562,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 |  variable frequency n-tau - multi-flame AVSP version""")
 
     def complete_export(self, text, line, begidx, endidx):
-        return [ f for f in self.exports if f.startswith(text) ]
+        return [f for f in self.exports if f.startswith(text)]
 
     imports = "AVSP5.6".split()
     def do_import(self, s):
@@ -580,10 +581,10 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
 
     def do_echo(self, s):
         """Print something on the command line. For batch debugging"""
-        print '"' + s + '"'
+        print '"{}"'.format(s)
 
     def complete_import(self, text, line, begidx, endidx):
-        return [ f for f in self.imports if f.startswith(text) ]
+        return [f for f in self.imports if f.startswith(text)]
 
     def _flame_finder(self, key):
         """Find a flame using it's name or it's number"""
@@ -600,8 +601,8 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
 
 
 if __name__ == '__main__':
-    stdin = None if len(sys.argv) == 1 else open(sys.argv[-1])
-    interpreter = FlameTransferCmd(stdin=stdin)
-    if stdin is not None:
-        interpreter.use_rawinput = False
-    interpreter.cmdloop_with_keyboard_interrupt()
+    STDIN = None if len(sys.argv) == 1 else open(sys.argv[-1])
+    INTERPRETER = FlameTransferCmd(stdin=STDIN)
+    if STDIN is not None:
+        INTERPRETER.use_rawinput = False
+    INTERPRETER.cmdloop_with_keyboard_interrupt()

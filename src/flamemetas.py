@@ -4,9 +4,6 @@ FlameMetas class to handle all meta information pertaining to an active flame.
 
 Created January 2017 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
-
-import json
-
 from collections import OrderedDict
 import numpy as np
 
@@ -16,24 +13,27 @@ from constants import VERSION, GRID_SIZE
 class FlameMetas(object):
     """Meta data associated to a flame"""
     def __init__(self, **kwargs):
-        # Override of __setattr__ prevents declarations here. 
-        # Calling object.__setattr__ is an approved workaround 
-        object.__setattr__(self, "mandatory_vals",
-                           "name version grid_size ndim generation_method "
-                           "volume n2_tau".split())
-        object.__setattr__(self, "mandatory_vecs", 
-                           "pt_min pt_max pt_ref vec_ref".split())
-        object.__setattr__(self, "static", OrderedDict((
-                             (val, None) for val in self.mandatory_vals)))
-        object.__setattr__(self, "vects", OrderedDict((
-                             (vec, None) for vec in self.mandatory_vecs)))
+        # Override of __setattr__ prevents declarations here.
+        # Calling object.__setattr__ is an approved workaround
+        object.__setattr__(
+            self, "mandatory_vals",
+            "name version grid_size ndim generation_method "
+            "volume n2_tau".split())
+        object.__setattr__(
+            self, "mandatory_vecs",
+            "pt_min pt_max pt_ref vec_ref".split())
+        object.__setattr__(
+            self, "static",
+            OrderedDict(((val, None) for val in self.mandatory_vals)))
+        object.__setattr__(
+            self, "vects", OrderedDict(((vec, None) for vec in self.mandatory_vecs)))
         self.static["version"] = VERSION
         self.static["grid_size"] = GRID_SIZE
         self.static.update(**kwargs)
 
     def __setattr__(self, name, value):
         """Override set attribute behavior
-        
+
         Everything goes to static, except if already in self.vects
         See set_vect to ensure value goes to self.vects
         """
@@ -45,7 +45,7 @@ class FlameMetas(object):
 
     def __getattr__(self, name):
         """Override get attribute behavior
-        
+
         Look for attributes in static and vects. None other are accepted
         """
         if name in self.static.keys():
@@ -73,8 +73,8 @@ class FlameMetas(object):
         """Load self from hdf5 attribute"""
         self.static.update(((key, attribute[key]) for key in attribute["static"]))
         self.vects.update((
-                (k, getattr(geometry, attribute["vect_types"][i])(attribute[k]))
-                for i,k in enumerate(attribute["vects"])))
+            (k, getattr(geometry, attribute["vect_types"][i])(attribute[k]))
+            for i, k in enumerate(attribute["vects"])))
 
     def get_metas(self):
         """Get all the meta data for the flame"""
@@ -84,12 +84,12 @@ class FlameMetas(object):
             for vect in self.vects.keys()})
         out["static"] = self.static.keys()
         out["vects"] = self.vects.keys()
-        out["vect_types"] = [v.__class__.__name__ for k,v in self.vects.items()]
+        out["vect_types"] = [val.__class__.__name__ for _, val in self.vects.items()]
         return out
 
     def write_json(self, filehandle):
         """Dump all static as JSON file
-        
+
         Twist: all numpy arrays must be converted to lists before JSON dump
         The `numpies` field is used to know who was a numpy before dump (for
         reconstruction).
@@ -97,17 +97,18 @@ class FlameMetas(object):
         import json
         out = self.get_metas()
         out['numpies'] = out["vects"][:]
-        for k, v in out.iteritems():
+        for key, val in out.iteritems():
             try:
-                out[k] = v.tolist()
-                out['numpies'].append(k)
+                out[key] = val.tolist()
+                out['numpies'].append(key)
             except AttributeError:
                 pass
         json.dump(out, filehandle, indent=4, separators=(',', ': '))
 
     def transform(self, method, *args):
         """Apply transformation to metas"""
-        [getattr(v, method)(*args) if v is not None else None
-         for v in self.vects.values()]
-        if method == "scale": 
+        for vec in self.vects.values():
+            if vec is not None:
+                getattr(vec, method)(*args)
+        if method == "scale":
             self.volume *= np.prod(*args)

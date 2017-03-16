@@ -273,7 +273,6 @@ class ActiveFlame(object):
             mesh["Coordinates/y"][...] = self.meshpoints[:, 1]
             if self.metas.ndim == 3:
                 mesh["Coordinates/z"][...] = self.meshpoints[:, 2]
-        #self.exec_hip(self._get_hip_script_generate())
         self.log.info("Wrote mesh file to " + self.mesh_file)
 
     def make_meshpoints(self):
@@ -288,21 +287,6 @@ class ActiveFlame(object):
             self.meshpoints[:, 1] = pt_min[1] + template["Coordinates/y"]*size[1]
             if self.metas.ndim == 3:
                 self.meshpoints[:, 2] = pt_min[2] + template["Coordinates/z"]*size[2]
-        #points = [np.linspace(pt_min[0], pt_max[0], self.metas.grid_size),
-        #          np.linspace(pt_min[1], pt_max[1], self.metas.grid_size)]
-        #if self.metas.ndim == 3:
-        #    points.append(np.linspace(pt_min[2], pt_max[2], self.metas.grid_size))
-        #out = np.array(np.meshgrid(*points)).reshape(self.metas.ndim, -1).T
-        #print "XX", out[:, 0].min(), out[:, 0].max()
-        #print "XX", out[:, 1].min(), out[:, 1].max()
-        #print "XX", out[:, 2].min(), out[:, 2].max()
-        #self.meshpoints = np.roll(out, 1, axis=1)  -> Why was that necessary??
-        #self.meshpoints = out
-        #print "YY", self.meshpoints[:, 0].min(), self.meshpoints[:, 0].max()
-        #print "YY", self.meshpoints[:, 1].min(), self.meshpoints[:, 1].max()
-        #print "YY", self.meshpoints[:, 2].min(), self.meshpoints[:, 2].max()
-        #out[:, [0, 1, 2]] = out[:, [2, 0, 1]]  -> Works but only for 3d
-        #np.savetxt("mshpts_gene.dat", self.meshpoints)
         self.log.debug("Mesh data stored with {0} points".format(self.meshpoints[:, 0].size))
 
     def _get_hip_script_generate(self):
@@ -405,11 +389,6 @@ class ActiveFlame(object):
         output = visu(self.mesh_file, self.flame_file)
         for line in output.split('\n'):
             self.log.debug("VISU: " + line)
-        #script = ["re hd -a {0.mesh_file} -s {0.flame_file}".format(self),
-        #          "wr hd {0.name}".format(self)]
-        #self.exec_hip("\n".join(script))
-        #self.harmonize_flame_name()
-        #self.write_h5()
 
     def write_group(self, hdf_obj, number=1):
         """Write full flame in /Flames/00X of hdf file"""
