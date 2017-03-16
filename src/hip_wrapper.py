@@ -30,7 +30,7 @@ class HipWrapper(object):
                 return "script_{:03}.hip".format(len(scripts)+1)
             else:
                 [os.remove(s) for s in scripts]
-                [os.remove(s+".log") for s in scripts]
+                [os.remove(s) for s in glob("script_*.hip.log")]
                 return "script.hip"
         path = next_script()
         self.last_hip_output = ""
