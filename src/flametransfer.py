@@ -251,7 +251,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
             avbp_field = self.read('Scalar field : ')
             avbp_thresh = self.read('Threshold value : ')
             self.flames.current = ActiveFlame(name, self.hip_wrapper)
-            self.flames.current.define_threshold_flame(
+            self.flames.current.define_flame_avbp_threshold(
                     avbp_mesh, avbp_sol, avbp_field, avbp_thresh)
         else:
             raise AssertionError("unkown flame shape")
@@ -273,22 +273,24 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         assert len(self.flames) > 0, "no flames defined yet"
         assert self.flames.current.metas.pt_ref is not None, (
                 "please set reference point and vector before writing")
-        if s[:2] == "me": # me(sh)
-            [flame.make_mesh() for flame in self.flames]
+        target = self.flames if "all" in s else [self.flames.current]
+        if s[:1] == "m": # me(sh)
+            [flame.make_mesh() for flame in target]
         elif s[:2] == "fl": # fl(ame)
-            [flame.write_h5() for flame in self.flames]
+            [flame.write_h5() for flame in target]
         elif s[:2] == "fu": # fu(ll)
-            [flame.write_full() for flame in self.flames]
+            [flame.write_full() for flame in target]
         else:
             raise AssertionError("unknown option")
 
     def help_write(self):
         print dedent("""\
-                Write output files
-                > wr(ite) me(sh)|fl(ame)|nt(au)
+                Write output files for all flames
+                > write mesh|flame|ntau [all]
                 |  mesh  : write hdf5 mesh file
                 |  flame : write hdf5 flame file
-                |  full  : write hdf5 mesh, flame and matching xmf file""")
+                |  full  : write hdf5 mesh, flame and matching xmf file
+                |  [all] : if present, do for all. Otherwise, just current""")
 
     def complete_write(self, text, line, begidx, endidx):
         return [f for f in self.writers if f.startswith(text)]
@@ -403,12 +405,12 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
             typ = typ[:2].lower()
             if typ in "n1 cr".split():
                 area, p_mean, gamma = input_floats(self.read("Area, Pmean, gamma : "))
-                self.flames.current.set_n1_tau(freq, tau, n, area, p_mean, gamma)
+                self.flames.current.set_n1_tau(freq, n, tau, area, p_mean, gamma)
             elif typ in "n2 gl".split():
-                self.flames.current.set_n2_tau(freq, tau, n)
+                self.flames.current.set_n2_tau(freq, n, tau)
             elif typ in "n3 ad".split():
                 u_bar, q_bar = input_floats(self.read("U_bar, Q_bar : "))
-                self.flames.current.set_n3_tau(freq, tau, n, u_bar, q_bar)
+                self.flames.current.set_n3_tau(freq, n, tau, u_bar, q_bar)
         elif switch == "o": # order swap
             assert len(args) == 3, "invalid number of arguments"
             nb1, fl1 = self._flame_finder(args[1])
@@ -548,17 +550,17 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     def do_export(self, s):
         """Export current flame"""
         assert len(self.flames) > 0, "no flames defined yet"
-        if s.lower() == "avsp6x":
-            avsp_mesh = self.read('AVSP mesh file : ')
-            avsp_sol = self.read('AVSP sol file : ')
-            self.flames.export_avsp6x(avsp_mesh, avsp_sol)
+        args = s.split()
+        if args[0].lower() == "avsp6x":
+            assert len(args) == 3, "USAGE: import AVSP6X mesh_file sol_file"
+            self.flames.export_avsp6x(*args[1:])
         else:
             raise AssertionError("unknown export format")
 
     def help_export(self):
         print dedent("""\
                 Export all flames to another format
-                > export AVSP6X
+                > export AVSP6X mesh_file sol_file
                 |  variable frequency n-tau - multi-flame""")
 
     def complete_export(self, text, line, begidx, endidx):
@@ -567,22 +569,22 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     imports = "AVSP5X AVSP6X".split()
     def do_import(self, s):
         """Import flames from other format"""
-        if s.lower() == "avsp5x":
-            avsp_mesh = self.read('AVSP mesh file : ')
-            avsp_sol = self.read('AVSP sol file : ')
-            self.flames.import_avsp5x(avsp_mesh, avsp_sol)
-        if s.lower() == "avsp6x":
-            avsp_sol = self.read('AVSP sol file : ')
-            self.flames.import_avsp6x(avsp_sol)
+        args = s.split()
+        if args[0].lower() == "avsp5x":
+            assert len(args) == 3, "USAGE: import AVSP5X mesh_file sol_file"
+            self.flames.import_avsp5x(*args[1:])
+        elif args[0].lower() == "avsp6x":
+            assert len(args) == 2, "USAGE: import AVSP6X sol_file"
+            self.flames.import_avsp6x(args[1])
         else:
             raise AssertionError("unknown import format")
 
     def help_import(self):
         print dedent("""\
                 Import all flames from another format
-                > import AVSP5X
+                > import AVSP5X mesh_file sol_file
                 |  single frequency - 1 type multi-flame
-                > import AVSP6X
+                > import AVSP6X sol_file
                 |  variable frequency n-tau - multi-flame""")
 
     def do_echo(self, s):

@@ -98,22 +98,22 @@ class ActiveFlame(object):
         """Define gain (N2) using Crocco's analytical formulation"""
         return gamma * p_mean * area / (gamma - 1.) * n1
 
-    def set_n1_tau(self, freq, tau, n1, area, p_mean, gamma):
+    def set_n1_tau(self, freq, n1, tau, area, p_mean, gamma):
         """Set N and tau from Crocco model (N1)"""
-        self.set_n2_tau(freq, tau, self.compute_n_crocco(n1, area, p_mean, gamma))
+        self.set_n2_tau(freq, self.compute_n_crocco(n1, area, p_mean, gamma), tau)
 
-    def set_n2_tau(self, freq, tau, n2):
+    def set_n2_tau(self, freq, n2, tau):
         """Set N and tau from global values (same as AVSP internal)"""
         self.metas.n2_tau = np.array((freq, n2, tau), ndmin=2)
         # Ugly!! There's probably a better way to keep orientation consistent
         if self.metas.n2_tau.shape[0] != 3:    
             self.metas.n2_tau = self.metas.n2_tau.T
 
-    def set_n3_tau(self, freq, tau, n3, u_bar, q_bar):
+    def set_n3_tau(self, freq, n3, tau, u_bar, q_bar):
         """Set N and tau from non dimensional values (N3)"""
         self.metas.u_bar = u_bar
         self.metas.q_bar = q_bar
-        self.set_n2_tau(freq, tau, n3 * u_bar / q_bar)
+        self.set_n2_tau(freq, n3 * u_bar / q_bar, tau)
 
     def get_n3(self):
         """Get value of N3 using u_bar and q_bar"""
@@ -122,9 +122,10 @@ class ActiveFlame(object):
         else:
             self.log.error("q_bar info not available, cannot compute n3")
 
-    def define_threshold_flame(self, avbp_mesh, avbp_sol, field, thresh):
+    def define_flame_avbp_threshold(self, avbp_mesh, avbp_sol, field, thresh):
         """Define flame from avbp scalar and threshold"""
-        with File(avbp_mesh, 'r') as mesh, File(avbp_sol, 'r') as sol:
+        self.log.debug("Generating scattershape from AVBP")
+        with File(avbp_sol, 'r') as sol:
             def find_field(name):
                 if field.lower() in name.lower(): return name
             selected_field = sol.visit(find_field)
@@ -132,52 +133,56 @@ class ActiveFlame(object):
                     "no field containing {0} found in {1}"
                     .format(field, avbp_sol))
             data = sol[sol.visit(find_field)].value
-            above = data > np.float(thresh)
+            flame_flag = data > np.float(thresh)
+        self.define_flame_scatter(avbp_mesh, flame_flag)
+
+    def define_flame_scatter(self, input_mesh, flame_flag):
+        """Use flame_flag on input_mesh to define ScatterPoint flame"""
+        with File(input_mesh, 'r') as mesh:
             x = mesh["Coordinates/x"].value
             y = mesh["Coordinates/y"].value
-            x_in = x[above]
-            y_in = y[above]
-            pt_min = [x_in.min(), y_in.min()]
-            pt_max = [x_in.max(), y_in.max()]
+            x_flame = x[flame_flag]
+            y_flame = y[flame_flag]
+            pt_min = [x_flame.min(), y_flame.min()]
+            pt_max = [x_flame.max(), y_flame.max()]
             klass = ScatterShape2D
             self.metas.generation_method = "avbp_scalar_threshold_2D"
             if 'z' in mesh["Coordinates"].keys():
                 self.metas.generation_method = "avbp_scalar_threshold_3D"
                 z = mesh["Coordinates/z"].value
-                z_in = z[above]
-                pt_min += [z_in.min()]
-                pt_max += [z_in.max()]
+                z_flame = z[flame_flag]
+                pt_min += [z_flame.min()]
+                pt_max += [z_flame.max()]
                 klass = ScatterShape3D
-        self.log.debug("Generating scattershape from AVBP")
         self._shape_metas(klass(pt_min, pt_max))
-        self.make_meshpoints()
-        with File("dummy_avbp.h5", 'w') as flame:
+        self.make_mesh()
+        with File("dummy.h5", 'w') as flame:
             flame.create_group("/Average")
-            flame['/Average/flames'] = 1.0*above
+            flame['/Average/flames'] = 1.0*flame_flag
             flame.create_group("/Parameters")
             flame['/Parameters/ndim'] = np.array([self.metas.ndim])
             flame['/Parameters/nnode'] = np.array([self.meshpoints.shape[0]])
             flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
         with File("dummy_flametrans.h5", 'w') as flame:
             flame.create_group("/Average")
-            flame['/Average/flames'] = 0.0*above
+            flame['/Average/flames'] = 0.0*flame_flag
             flame.create_group("/Parameters")
             flame['/Parameters/ndim'] = np.array([self.metas.ndim])
             flame['/Parameters/nnode'] = np.array([self.meshpoints.shape[0]])
             flame['/Parameters/versionstring'] = "flametransfer_v" + self.metas.version
         script = [
-                "re hd -a {0} -s dummy_avbp.h5".format(avbp_mesh),
-                "re hd -a {0} -s dummy_flametrans.h5".format(self.mesh_file),
-                "set in-rim 0.1",
-                "in gr 1",
-                "wr hd dummy_flame",
-                "qu",
-                ]
+            "re hd -a {0} -s dummy.h5".format(input_mesh),
+            "re hd -a {0} -s dummy_flametrans.h5".format(self.mesh_file),
+            "set in-rim 0.1",
+            "in gr 1",
+            "wr hd dummy_flame",
+            "qu",
+            ]
         self.hip_wrapper.execute('\n'.join(script))
         with File("dummy_flame.sol.h5", 'r') as flame:
             self.inside_points = flame["/Average/flames"].value
         if not DEBUG:
-            os.remove("dummy_avbp.h5")
+            os.remove("dummy.h5")
             os.remove("dummy_flametrans.h5")
             os.remove("dummy_flame.sol.h5")
             os.remove("dummy_flame.mesh.h5")
