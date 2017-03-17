@@ -506,7 +506,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         assert len(args) == 2, "invalid number of arguments"
         src, dest = args
         assert not is_number(dest), "flame name cannot be a number"
-        assert dest not in [flame.name for flame in self.flames], (
+        assert dest not in self.flames.names, (
                 "{} is already a declared flame".format(dest))
         fla_nb, flame = self._flame_finder(src)
         self.flames.append(copy.deepcopy(self.flames[fla_nb]))
@@ -545,6 +545,29 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
 
     def complete_transform(self, text, line, begidx, endidx):
         return [f for f in self.transforms if f.startswith(text)]
+
+    def do_drop(self, s):
+        """Forget a flame"""
+        assert len(self.flames) > 0, "no flames defined yet"
+        fla_nb, flame = self._flame_finder(s)
+        if self.flames.current == flame:
+            if len(self.flames) == 1:
+                self.flames.current = None
+            else:
+                if fla_nb+1 == len(self.flames):
+                    self.flames.current = self.flames[-2]
+                else:
+                    self.flames.current = self.flames[-1]
+        del self.flames[fla_nb]
+
+    def help_drop(self):
+        print dedent("""\
+                Drop flame reference
+                > drop <flame>
+                |  <flame>: name or number of flame to copy""")
+
+    def complete_drop(self, text, line, begidx, endidx):
+        return [f for f in self.flames.names if f.startswith(text)]
 
     exports = "AVSP6X".split()
     def do_export(self, s):
@@ -587,12 +610,12 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                 > import AVSP6X sol_file
                 |  variable frequency n-tau - multi-flame""")
 
+    def complete_import(self, text, line, begidx, endidx):
+        return [f for f in self.imports if f.startswith(text)]
+
     def do_echo(self, s):
         """Print something on the command line. For batch debugging"""
         print '"{}"'.format(s)
-
-    def complete_import(self, text, line, begidx, endidx):
-        return [f for f in self.imports if f.startswith(text)]
 
     def _flame_finder(self, key):
         """Find a flame using it's name or it's number"""

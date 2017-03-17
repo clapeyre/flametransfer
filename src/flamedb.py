@@ -32,6 +32,10 @@ class FlameDB(UserList, object):
         self.hip_wrapper = hip_wrapper
         self.current = None
 
+    @property
+    def names(self):
+        return [fla.name for fla in self.data]
+
     def export_avsp6x(self, mesh, sol):
         """Export all flames to target"""
         shutil.copy(sol, "avsp_tmp0.sol.h5")
