@@ -11,9 +11,18 @@ __all__ = ['GRID_SIZE',
 import os
 import semver
 
-GRID_SIZE = 32
+def environ_default(key, default):
+    """Get value from environment if defined, otherwise default"""
+    env = os.environ.get(key)
+    if env is None:
+        return default
+    else:
+        return env
+
 VERSION = "1.1.0-alpha"
-DEBUG = True if "DEBUG" in os.environ.keys() else False
+GRID_SIZE = int(environ_default("GRID_SIZE", 32))
+DEBUG = environ_default("DEBUG", False)
+HIP_START_TIME = float(environ_default("HIP_START_TIME", 1.0))
 
 class VersionError(Exception):
     """Custom error for version check failure"""
