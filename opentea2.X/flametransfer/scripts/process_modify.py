@@ -115,6 +115,26 @@ def update_flame_params(pr):
     ds = pr.ds
     selected_flame = ds.getValue("cho_update_flame_params")
     metas = pr.get_metas(paths=[pr.libobj_file(selected_flame)])[selected_flame]
+    # Rebuild n-tau
+    ds.removeNode("n_tau")
+    ds.addChild("n_tau", "", "modify")
+    single_val = len(metas["n2_tau"][0]) == 1
+    if single_val:
+        ds.addChild("xor_n_and_tau", "single_values", "n_tau")
+        ds.addChild("single_values", "", "xor_n_and_tau")
+        ds.addChild("values",
+                    to_ds_list("Frequency N tau".split(),
+                               [x for y in metas["n2_tau"] for x in y]),
+                    "single_values")
+    else:
+        n_tau_file = metas["name"] + ".n2_tau.dat"
+        with open(n_tau_file, "w") as f:
+            f.write("# Freq N2 tau\n")
+            np.savetxt(f, np.array(metas["n2_tau"]).T)
+        ds.addChild("xor_n_and_tau", "from_file", "n_tau")
+        ds.addChild("n_tau_data_path", n_tau_file, "xor_n_and_tau")
+
+    # Rebuild xor_ndim
     ds.removeNode("xor_ndim")
     ndim = "three_d" if "3D" in metas["generation_method"] else "two_d"
     ds.addChild("xor_ndim", ndim, "modify")
@@ -155,6 +175,7 @@ if __name__ == '__main__':
     import sys
     pr = FlameTransferProcess('dataset.xml')
     if "update" in sys.argv:
+        pr.log.info("Updating interface, no modifications to the flame")
         update_flame_params(pr)
     else:
         process_modify(pr)

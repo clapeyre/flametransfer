@@ -45,6 +45,11 @@
         [section='N':] Gain of Flame Transfer Function (see table).
         [section='tau':] Delay of Flame Transfer Function in s
         [image=ntau_conventions.gif; caption=Conventions for N.]
+
+        Note: if you are reloading an existing flame, only N2 is stored
+        (as this is the value used by AVSP), hence the N2 values will be
+        displayed. If several frequencies were given, the n_tau file is
+        re-written from the flame, and referenced.
     </docu>
 </model>
 
@@ -106,6 +111,11 @@
         <model name="ptref" title="Active flame references">
            <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0" fixed=""/>
            <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0" fixed=""/>
+            <docu>
+                Reference vector is stored as unit vector. If you reload a (1, 1, 0) vector, it's
+                values will be changed to (1/sqrt(2), 1/sqrt(2), 0), but it's still pointing in the
+                same direction.
+            </docu>
         </model>
         <xor name="xor_flame_geo" title="Flame geometry" default="analytical2D_rectangle" groups="on">
             <model name="analytical2D_rectangle" title="Rectangle">
