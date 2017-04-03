@@ -274,11 +274,11 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         assert self.flames.current.metas.pt_ref is not None, (
                 "please set reference point and vector before writing")
         target = self.flames if "all" in s else [self.flames.current]
-        if s[:1] == "m": # me(sh)
+        if s[:1] == "m": # mesh
             [flame.make_mesh() for flame in target]
-        elif s[:2] == "fl": # fl(ame)
+        elif s[:2] == "fl": # flame
             [flame.write_h5() for flame in target]
-        elif s[:2] == "fu": # fu(ll)
+        elif s[:2] == "fu": # full
             [flame.write_full() for flame in target]
         else:
             raise AssertionError("unknown option")
