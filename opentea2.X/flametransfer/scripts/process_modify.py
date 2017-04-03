@@ -115,6 +115,7 @@ def update_flame_params(pr):
     ds = pr.ds
     selected_flame = ds.getValue("cho_update_flame_params")
     metas = pr.get_metas(paths=[pr.libobj_file(selected_flame)])[selected_flame]
+    gen_meth = metas["generation_method"]
     # Rebuild n-tau
     ds.removeNode("n_tau")
     ds.addChild("n_tau", "", "modify")
@@ -136,40 +137,40 @@ def update_flame_params(pr):
 
     # Rebuild xor_ndim
     ds.removeNode("xor_ndim")
-    ndim = "three_d" if "3D" in metas["generation_method"] else "two_d"
+    ndim = "three_d" if "3D" in gen_meth else "two_d"
     ds.addChild("xor_ndim", ndim, "modify")
     ds.addChild(ndim, "", "xor_ndim")
     ds.addChild("ptref", "", ndim)
     ds.addChild("ptref_list", to_ds_list('xyz', metas["pt_ref"]), "ptref")
     ds.addChild("vecref_list", to_ds_list('xyz', metas["vec_ref"]), "ptref")
-    ds.addChild("xor_flame_geo", metas["generation_method"], ndim)
-    ds.addChild(metas["generation_method"], "", "xor_flame_geo")
+    ds.addChild("xor_flame_geo", gen_meth, ndim)
+    ds.addChild(gen_meth, "", "xor_flame_geo")
     sh_args = json.loads(metas["shape_params"])[1]
-    if metas["generation_method"] == "analytical2D_disc":
-        ds.addChild("ana_flame_center", to_ds_list('xy', sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_radius", str(sh_args[1]), metas["generation_method"])
-    elif metas["generation_method"] == "analytical2D_rectangle":
-        ds.addChild("ana_flame_pt_min", to_ds_list('ptmin_x ptmin_y'.split(), sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_pt_max", to_ds_list('ptmax_x ptmax_y'.split(), sh_args[1]), metas["generation_method"])
-    elif metas["generation_method"] == "analytical3D_brick":
-        ds.addChild("ana_flame_pt_min", to_ds_list('ptmin_x ptmin_y ptmin_z'.split(), sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_pt_max", to_ds_list('ptmax_x ptmax_y ptmax_z'.split(), sh_args[1]), metas["generation_method"])
-    elif metas["generation_method"] == "analytical3D_sphere":
-        ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_radius", str(sh_args[1][0]), metas["generation_method"])
-    elif metas["generation_method"] == "analytical3D_cylinder":
-        ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), metas["generation_method"])
-        ds.addChild("ana_flame_radius", str(sh_args[1][0]), metas["generation_method"])
-        ds.addChild("ana_flame_vector", to_ds_list('u_x u_y u_z'.split(), sh_args[2]), metas["generation_method"])
-    elif metas["generation_method"] == "avbp_scalar_threshold_3D":
-        ds.addChild("avbp_sol", metas["avbp_sol"])
-        ds.addChild("avbp_mesh", metas["avbp_mesh"])
-        ds.addChild("scal", metas["field"])
-        ds.addChild("threshold", str(metas["threshold"]))
+    if gen_meth == "analytical2D_disc":
+        ds.addChild("ana_flame_center", to_ds_list('xy', sh_args[0]), gen_meth)
+        ds.addChild("ana_flame_radius", str(sh_args[1]), gen_meth)
+    elif gen_meth == "analytical2D_rectangle":
+        ds.addChild("ana_flame_pt_min", to_ds_list('ptmin_x ptmin_y'.split(), sh_args[0]), gen_meth)
+        ds.addChild("ana_flame_pt_max", to_ds_list('ptmax_x ptmax_y'.split(), sh_args[1]), gen_meth)
+    elif gen_meth == "analytical3D_brick":
+        ds.addChild("ana_flame_pt_min", to_ds_list('ptmin_x ptmin_y ptmin_z'.split(), sh_args[0]), gen_meth)
+        ds.addChild("ana_flame_pt_max", to_ds_list('ptmax_x ptmax_y ptmax_z'.split(), sh_args[1]), gen_meth)
+    elif gen_meth == "analytical3D_sphere":
+        ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), gen_meth)
+        ds.addChild("ana_flame_radius", str(sh_args[1][0]), gen_meth)
+    elif gen_meth == "analytical3D_cylinder":
+        ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), gen_meth)
+        ds.addChild("ana_flame_radius", str(sh_args[1][0]), gen_meth)
+        ds.addChild("ana_flame_vector", to_ds_list('u_x u_y u_z'.split(), sh_args[2]), gen_meth)
+    elif gen_meth == "avbp_scalar_threshold_3D":
+        ds.addChild("avbp_sol", metas["avbp_sol"], gen_meth)
+        ds.addChild("avbp_mesh", metas["avbp_mesh"], gen_meth)
+        ds.addChild("scal", metas["field"], gen_meth)
+        ds.addChild("threshold", str(metas["threshold"]), gen_meth)
     else:
         raise ValueError("Unknown generation method {}. Cannot set default "
                          "values in 'modify' tab"
-                         .format(metas["generation_method"]))
+                         .format(gen_meth))
 
 def to_ds_list(keys, values):
     out = []

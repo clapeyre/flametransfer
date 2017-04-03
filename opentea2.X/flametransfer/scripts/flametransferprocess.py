@@ -127,7 +127,6 @@ class FlameTransferProcess(LibProcess):
         """Replicate the flame by rotating
         Rotate by angle (degrees) to obtain final_nb flames
         """
-        print "debugging..."
         angles = [i*angle for i in range(1, final_nb)]
         script = ["read " + self.libobj_file(name)]
         new_flames = ["{0}_{1}".format(name, angl) for angl in angles]
