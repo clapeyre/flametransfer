@@ -2,7 +2,7 @@
     <param name="flag_update_flame" title="Read from existing flame" type="onoff" default="0"/>
 </model>
 <model name="update_flame_params" title="Read parameters from existing flame" layout="flat" existif="#flag_update_flame#=={1}">
-    <choice name="cho_update_flame_params" title="Choose a flame" require="list_written_libobjs" />
+    <choice name="cho_update_flame_params" title="Choose a flame" require="list_non_transformed_libobjs" />
     <action name="act_update" title="Update" script="process_modify.py" script_args="update"/>
 </model>
 

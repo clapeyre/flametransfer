@@ -12,9 +12,8 @@ import numpy as np
 
 from os.path import isfile, basename
 
-from XDR2 import XDRException, XDRUnknownValue
+from XDR2 import XDRInterrupt
 from flametransferprocess import FlameTransferProcess
-from process_library import process_library
 
 def process_modify(pr):
     """Modify existing or new virgin flame"""
@@ -67,14 +66,15 @@ def process_modify(pr):
                   basename(avbp_mesh),
                   basename(avbp_sol),
                   scal,
-                  thresh]
+                  thresh,
+                  "set static avbp_mesh string",
+                  avbp_mesh,
+                  "set static avbp_sol string",
+                  avbp_sol,
+                 ]
         put_files += [avbp_sol, avbp_mesh]
     else:
-        raise XDRUnknownValue(
-          "xor_flame_geo", flame_geo,
-          "analytical2D_disc analytical2D_rectangle"
-          " analytical3D_brick analytical3D_sphere"
-          " analytical3D_cylinder scal_and_thresh")
+        raise XDRInterrupt("Unknown value for xor_flame_geo: " + flame_geo)
 
     n_tau_type = ds.getValue("xor_n_and_tau", "modify")
     if n_tau_type == "single_values":
@@ -161,9 +161,15 @@ def update_flame_params(pr):
         ds.addChild("ana_flame_center", to_ds_list('xyz', sh_args[0]), metas["generation_method"])
         ds.addChild("ana_flame_radius", str(sh_args[1][0]), metas["generation_method"])
         ds.addChild("ana_flame_vector", to_ds_list('u_x u_y u_z'.split(), sh_args[2]), metas["generation_method"])
+    elif metas["generation_method"] == "avbp_scalar_threshold_3D":
+        ds.addChild("avbp_sol", metas["avbp_sol"])
+        ds.addChild("avbp_mesh", metas["avbp_mesh"])
+        ds.addChild("scal", metas["field"])
+        ds.addChild("threshold", str(metas["threshold"]))
     else:
-        pr.log.error("Unknown generation method {}. Cannot set default values in 'modify' tab".format(metas["generation_method"]))
-        raise ValueError
+        raise ValueError("Unknown generation method {}. Cannot set default "
+                         "values in 'modify' tab"
+                         .format(metas["generation_method"]))
 
 def to_ds_list(keys, values):
     out = []

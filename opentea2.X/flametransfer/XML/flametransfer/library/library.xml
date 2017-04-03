@@ -8,11 +8,28 @@
     <model name="import_flame" title="Import existing flame">
         <param name="inputfile_import_flame" title="File" type="file" filter="h5" default=""/>
     </model>
-    <model name="duplicate_flame" title="Duplicate flame">
-        <choice name="cho_flame" title="Flame to duplicate" require="list_written_libobjs" />
+    <model name="replicate_flame" title="Replicate flame">
+        <choice name="cho_flame" title="Flame to replicate" require="list_written_libobjs" />
         <desc>
-            Note: only available for flames that have alredy been written to disk
+            Note: only available for flames that have already been written to disk
         </desc>
+        <xor name="xor_transform" title="Transform" default="none">
+            <model name="none" title="None" layout="flat">
+                <param name="flag_rename_duplicate" title="Rename duplicate" type="onoff" default="0"/>
+                <param name="input_flame_name" title="New name" type="string" default="" existif="#flag_rename_duplicate#=={1}"/>
+            </model>
+            <model name="translate" title="Translate">
+                <param name="list_translate_flame" title="Translate by" type="list_double" fixed="" default="x;0;y;0;z;0"/>
+                <param name="int_nb_flames_final" title="Final nb flames" type="integer" default="2"/>
+            </model>
+            <model name="rotate" title="Rotate">
+                <param name="dbl_rotate_angle" title="Rotation angle" type="double" default="90"/>
+                <param name="int_nb_flames_final" title="Final nb flames" type="integer" default="2"/>
+                <desc>
+                    Rotate around the x axis
+                </desc>
+            </model>
+        </xor>
     </model>
     <model name="rename_flame" title="Rename existing flame">
         <choice name="cho_flame" title="Flame to rename" require="list_written_libobjs" />
@@ -37,3 +54,4 @@
 
 <info name="list_libobjs_in_project" default="" visibility="hidden" />
 <info name="list_written_libobjs" default="" visibility="hidden" />
+<info name="list_non_transformed_libobjs" default="" visibility="hidden" />

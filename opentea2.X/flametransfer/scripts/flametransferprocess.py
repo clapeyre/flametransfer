@@ -11,12 +11,11 @@ import json
 import numpy as np
 
 from os.path import join, isfile, isdir, basename
-from glob import glob
 
 from XDR2 import LibProcess, RUN_CURRENT, COMMON
-from XDR2.exceptions import XDRException
 
 __all__ = ['FlameTransferProcess']
+
 
 class FlameTransferProcess(LibProcess):
     """Child class of LibProcess, adding FlameTransfer specific methods"""
@@ -31,9 +30,22 @@ class FlameTransferProcess(LibProcess):
 
     def libobj_name(self, path): return basename(path)[:-9]
 
+    def update_libobjs(self):
+        """Override mother method to update list_non_transformed_libobjs"""
+        LibProcess.update_libobjs(self)
+        metas = self.get_metas()
+        non_transformed = [name for name in self.libobjs
+                           if not "transform" in metas[name].keys()]
+        for name in self.libobjs:
+            print " >>> ", name
+            print metas[name].keys()
+        self.ds.setValue(";".join(non_transformed),
+                         "list_non_transformed_libobjs")
+
     def write_metas(self):
         metas = self.get_metas()
-        for order, flame_name in enumerate(set(self.libobjs)-set(self.unwritten_libobjs)):
+        for order, flame_name in enumerate(set(self.libobjs)
+                                           - set(self.unwritten_libobjs)):
             ipcode="item_{0:07d}".format(order)
             self.ds.addChild(ipcode, flame_name, "mul_libobjs")
             self.ds.addChild("written", "yes", ipcode, "mul_libobjs")
@@ -74,18 +86,64 @@ class FlameTransferProcess(LibProcess):
         self.copy_file(path, '.')
         self.add_libobj(values["name"])
 
-    def duplicate_libobj(self, name):
+    def duplicate_libobj(self, name, new_name=None):
         """Specific implementation of object duplication"""
+        if new_name is None:
+           new_name = name + '_duplicate'
         script = ["read " + self.libobj_file(name),
                   "set static name string",
-                  name + '_duplicate',
+                  new_name,
                   "wr fl"
                   ]
         self.execute_script(
-                '-duplicate-', "\n".join(script),
+                '-replicate-', "\n".join(script),
                 put_files=[self.libobj_file(name)],
-                get_files=[self.libobj_file(name + '_duplicate')])
-        self.add_libobj(name + '_duplicate')
+                get_files=[self.libobj_file(new_name)])
+        self.add_libobj(new_name)
+
+    def replicate_translate(self, name, vector, final_nb):
+        """Replicate the flame by translating
+        Translate by vector to obtain final_nb flames
+        """
+        script = ["read " + self.libobj_file(name)]
+        new_flames = ["{0}_{1}".format(name, i) for i in range(2, final_nb+1)]
+        translate = vector
+        for target in new_flames:
+            script += ["copy {0} {1}".format(name, target),
+                       "transform translate",
+                       " ".join(str(e) for e in translate),
+                       "set static transform string",
+                       "translate {0} by {1}".format(name, translate),
+                      ]
+            translate += vector
+        script += ["wr fl"]
+        self.execute_script(
+                '-replicate-', "\n".join(script),
+                put_files=[self.libobj_file(name)],
+                get_files=[self.libobj_file(f) for f in new_flames])
+        self.add_libobj(*new_flames)
+
+    def replicate_rotate(self, name, angle, final_nb):
+        """Replicate the flame by rotating
+        Rotate by angle (degrees) to obtain final_nb flames
+        """
+        print "debugging..."
+        angles = [i*angle for i in range(1, final_nb)]
+        script = ["read " + self.libobj_file(name)]
+        new_flames = ["{0}_{1}".format(name, angl) for angl in angles]
+        for angl, target in zip(angles, new_flames):
+            script += ["copy {0} {1}".format(name, target),
+                       "transform rotate",
+                       "x",
+                       str(angl),
+                      "set static transform string",
+                      "rotate {0} by {1}".format(name, angl)]
+        script += ["wr fl"]
+        self.execute_script(
+                '-replicate-', "\n".join(script),
+                put_files=[self.libobj_file(name)],
+                get_files=[self.libobj_file(f) for f in new_flames])
+        self.add_libobj(*new_flames)
 
     def execute_script(self, action, script, put_files=[], get_files=[]):
         extor = self.get_executor(action)
@@ -106,17 +164,20 @@ class FlameTransferProcess(LibProcess):
 
     def get_metas(self, paths=None):
         """Parse output of 'list metas' """
-        paths = paths if paths else [self.libobj_file(name) for name in self.libobjs]
+        paths = paths if paths else [self.libobj_file(name)
+                                     for name in self.libobjs]
         self.log.debug("Fetching metas for " + " ".join(paths))
         names = [self.libobj_name(path) for path in paths]
         script = ["read {} metas_only\nlist json".format(basename(f))
                   for f in paths]
-        metas = ["{}.metas.json".format(self.libobj_name(path)) for path in paths]
+        metas = ["{}.metas.json".format(self.libobj_name(path))
+                 for path in paths]
         self.execute_script("-get_metas-",
                             "\n".join(script),
                             put_files=paths,
                             get_files=metas)
-        dicts = {name: json.load(open(path)) for name, path in zip(names, metas)}
+        dicts = {name: json.load(open(path))
+                 for name, path in zip(names, metas)}
         [d.update({k: np.array(v) for k, v in d.items()
                    if k in d["numpies"]})
          for d in dicts.values()]

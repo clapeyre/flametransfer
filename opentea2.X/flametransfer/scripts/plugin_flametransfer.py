@@ -21,7 +21,7 @@ class PluginFlametransfer(object):
         if action == "-hip-":
             command_exe = self.hipexec + " ./script.hip"
 
-        elif action in ["-get_metas-", "-create_flame-", "-duplicate-", "-rename-"]:
+        elif action in ["-get_metas-", "-create_flame-", "-replicate-", "-rename-"]:
             command_exe = self.flametransferexec + " ./script.ft"
         
         else:
