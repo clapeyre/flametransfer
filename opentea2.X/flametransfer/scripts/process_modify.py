@@ -19,7 +19,7 @@ from flametransferprocess import FlameTransferProcess
 
 def process_modify(pro):
     """Modify existing or new virgin flame"""
-    dst = pro.dst
+    dst = pro.ds
 
     label = dst.getValue("cho_write_to_flame")
     put_files = []

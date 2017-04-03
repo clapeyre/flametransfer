@@ -11,7 +11,7 @@ from flametransferprocess import FlameTransferProcess
 
 def process_library(pro):
     """Refresh the list of flames in the library"""
-    dst = pro.dst
+    dst = pro.ds
     action = dst.getValue("xor_lib_action")
     if action == "refresh_flame_list":
         pass  # Refresh done on process initialization

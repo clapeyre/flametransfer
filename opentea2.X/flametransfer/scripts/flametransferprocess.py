@@ -12,7 +12,7 @@ import numpy as np
 
 from os.path import join, isfile, isdir, basename
 
-from XDR2 import LibProcess, RUN_CURRENT, COMMON
+from XDR2 import LibProcess, RUN_CURRENT
 
 __all__ = ['FlameTransferProcess']
 
@@ -35,10 +35,7 @@ class FlameTransferProcess(LibProcess):
         LibProcess.update_libobjs(self)
         metas = self.get_metas()
         non_transformed = [name for name in self.libobjs
-                           if not "transform" in metas[name].keys()]
-        for name in self.libobjs:
-            print " >>> ", name
-            print metas[name].keys()
+                           if "transform" not in metas[name].keys()]
         self.ds.setValue(";".join(non_transformed),
                          "list_non_transformed_libobjs")
 
@@ -46,18 +43,22 @@ class FlameTransferProcess(LibProcess):
         metas = self.get_metas()
         for order, flame_name in enumerate(set(self.libobjs)
                                            - set(self.unwritten_libobjs)):
-            ipcode="item_{0:07d}".format(order)
+            ipcode = "item_{0:07d}".format(order)
             self.ds.addChild(ipcode, flame_name, "mul_libobjs")
             self.ds.addChild("written", "yes", ipcode, "mul_libobjs")
             self.ds.addChild(
                     "flame_details", metas[flame_name]["generation_method"],
                     ipcode, "mul_libobjs")
-            self.ds.addChild(
-                    "ftf_details",
-                    "Freq, N2, tau\n" + str(metas[flame_name]["n2_tau"]),
-                    ipcode, "mul_libobjs")
+            details = "\n".join(("Freq, N2, tau",
+                                 str(metas[flame_name]["n2_tau"]),
+                                 ""
+                                 "Ref point",
+                                 str(metas[flame_name]["pt_ref"]),
+                                 "Ref vector",
+                                 str(metas[flame_name]["vec_ref"])))
+            self.ds.addChild("ftf_details", details, ipcode, "mul_libobjs")
         for order, flame_name in enumerate(self.unwritten_libobjs):
-            ipcode="item_{0:07d}".format(order + len(self.libobjs))
+            ipcode = "item_{0:07d}".format(order + len(self.libobjs))
             self.ds.addChild(ipcode, flame_name, "mul_libobjs")
             self.ds.addChild("written", "no", ipcode, "mul_libobjs")
             self.ds.addChild("flame_details", "not set", ipcode, "mul_libobjs")
@@ -89,7 +90,7 @@ class FlameTransferProcess(LibProcess):
     def duplicate_libobj(self, name, new_name=None):
         """Specific implementation of object duplication"""
         if new_name is None:
-           new_name = name + '_duplicate'
+            new_name = name + '_duplicate'
         script = ["read " + self.libobj_file(name),
                   "set static name string",
                   new_name,
@@ -113,8 +114,7 @@ class FlameTransferProcess(LibProcess):
                        "transform translate",
                        " ".join(str(e) for e in translate),
                        "set static transform string",
-                       "translate {0} by {1}".format(name, translate),
-                      ]
+                       "translate {0} by {1}".format(name, translate)]
             translate += vector
         script += ["wr fl"]
         self.execute_script(
@@ -135,8 +135,8 @@ class FlameTransferProcess(LibProcess):
                        "transform rotate",
                        "x",
                        str(angl),
-                      "set static transform string",
-                      "rotate {0} by {1}".format(name, angl)]
+                       "set static transform string",
+                       "rotate {0} by {1}".format(name, angl)]
         script += ["wr fl"]
         self.execute_script(
                 '-replicate-', "\n".join(script),
