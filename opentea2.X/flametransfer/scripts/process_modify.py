@@ -117,7 +117,7 @@ def process_modify(pro):
 
 def update_flame_params(pro):
     """Update the 'modify' tab with values from a selected existing flame"""
-    dst = pro.dst
+    dst = pro.ds
     selected_flame = dst.getValue("cho_update_flame_params")
     metas = pro.get_metas(
         paths=[pro.libobj_file(selected_flame)])[selected_flame]
