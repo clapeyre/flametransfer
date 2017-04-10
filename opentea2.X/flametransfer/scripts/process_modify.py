@@ -151,7 +151,7 @@ def update_flame_params(pro):
     dst.addChild("vecref_list", to_ds_list('xyz', metas["vec_ref"]), "ptref")
     dst.addChild("xor_flame_geo", gen_meth, ndim)
     dst.addChild(gen_meth, "", "xor_flame_geo")
-    sh_args = json.load(metas["shape_params"])[1]
+    sh_args = json.loads(metas["shape_params"])[1]
     if gen_meth == "analytical2D_disc":
         dst.addChild("ana_flame_center", to_ds_list('xy', sh_args[0]), gen_meth)
         dst.addChild("ana_flame_radius", str(sh_args[1]), gen_meth)
