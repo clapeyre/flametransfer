@@ -42,7 +42,7 @@ class VersionError(Exception):
 
 def compatibility(ver):
     if ver == "1.1B1":
-        return "1.0.0-alpha"
+        return "0.3.0-beta"
     return ver
 
 def version_checker(ver):
