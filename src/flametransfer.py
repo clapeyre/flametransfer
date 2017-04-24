@@ -569,6 +569,11 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     def complete_drop(self, text, line, begidx, endidx):
         return [f for f in self.flames.names if f.startswith(text)]
 
+    # delete == drop
+    do_delete = do_drop
+    help_delete = help_drop
+    complete_delete = complete_drop
+
     exports = "AVSP6X".split()
     def do_export(self, s):
         """Export current flame"""

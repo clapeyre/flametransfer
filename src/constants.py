@@ -9,6 +9,9 @@ __all__ = ['GRID_SIZE',
           ]
 
 import os
+import logging
+log = logging.getLogger(__name__)
+
 def environ_default(key, default):
     """Get value from environment if defined, otherwise default"""
     env = os.environ.get(key)
@@ -32,7 +35,6 @@ except ImportError:
 
 GRID_SIZE = 32
 DEBUG = True if "DEBUG" in os.environ.keys() else False
-print "XXX", DEBUG
 
 class VersionError(Exception):
     """Custom error for version check failure"""
@@ -44,9 +46,7 @@ def compatibility(ver):
     return ver
 
 def version_checker(ver):
-    if DEBUG:
-        print " -- Checking {} against current version: {}".format(ver,
-                                                                   VERSION)
+    log.debug("Checking {} against {}".format(ver, VERSION))
     if not CHECK_VERSION:
         return True
     ver = compatibility(ver)
@@ -64,7 +64,7 @@ def version_checker(ver):
             print " WARNING : object was written with old discontinued version."
             print "           Compatibility is not guaranteed."
             return False
-    elif minor < cminor:
+    elif minor > cminor:
         raise VersionError(
                 "Trying to read object written with future version. "
                 "Please upgrade your software.")
