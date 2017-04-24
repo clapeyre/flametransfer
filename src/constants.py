@@ -20,7 +20,7 @@ def environ_default(key, default):
     else:
         return env
 
-VERSION = "1.1.0-rc"
+VERSION = "1.0.0-rc"
 GRID_SIZE = int(environ_default("GRID_SIZE", 32))
 DEBUG = environ_default("DEBUG", False)
 HIP_START_TIME = float(environ_default("HIP_START_TIME", 1.0))
@@ -42,7 +42,7 @@ class VersionError(Exception):
 
 def compatibility(ver):
     if ver == "1.1B1":
-        return "1.0.1-beta"
+        return "1.0.0-alpha"
     return ver
 
 def version_checker(ver):
