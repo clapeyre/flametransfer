@@ -79,7 +79,7 @@ class HipWrapper(object):
             if process.wait() != 0:
                 raise AssertionError("error in hip script. See log")
             if DEBUG:
-                with open(path+".log", "w") as out:
+                with open("hip.log", "w") as out:
                     out.write(self.last_hip_output)
         if not version_check:
             print "\n --- Done executing hip"

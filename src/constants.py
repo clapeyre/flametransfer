@@ -17,7 +17,7 @@ def environ_default(key, default):
     else:
         return env
 
-VERSION = "1.1.0-alpha"
+VERSION = "1.1.0-rc"
 GRID_SIZE = int(environ_default("GRID_SIZE", 32))
 DEBUG = environ_default("DEBUG", False)
 HIP_START_TIME = float(environ_default("HIP_START_TIME", 1.0))
@@ -32,6 +32,7 @@ except ImportError:
 
 GRID_SIZE = 32
 DEBUG = True if "DEBUG" in os.environ.keys() else False
+print "XXX", DEBUG
 
 class VersionError(Exception):
     """Custom error for version check failure"""
@@ -40,8 +41,12 @@ class VersionError(Exception):
 def compatibility(ver):
     if ver == "1.1B1":
         return "1.0.1-beta"
+    return ver
 
 def version_checker(ver):
+    if DEBUG:
+        print " -- Checking {} against current version: {}".format(ver,
+                                                                   VERSION)
     if not CHECK_VERSION:
         return True
     ver = compatibility(ver)
