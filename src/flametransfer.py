@@ -164,7 +164,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         print "ERROR: Please define the HIP_EXEC environment variable"
         sys.exit()
     intro = dedent("""\
-            Welcome to the FlameTransfer V.{} command line
+            Welcome to the FlameTransfer V. {} command line
             Type help or ? for a list of commands,
                  ?about for more on this app""").format(VERSION)
     prompt = "ft > "

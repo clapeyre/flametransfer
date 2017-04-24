@@ -9,8 +9,6 @@ __all__ = ['GRID_SIZE',
           ]
 
 import os
-import semver
-
 def environ_default(key, default):
     """Get value from environment if defined, otherwise default"""
     env = os.environ.get(key)
@@ -24,22 +22,49 @@ GRID_SIZE = int(environ_default("GRID_SIZE", 32))
 DEBUG = environ_default("DEBUG", False)
 HIP_START_TIME = float(environ_default("HIP_START_TIME", 1.0))
 
+try:
+    from packaging import version
+    CHECK_VERSION = True
+except ImportError:
+    print " !!WARNING!!: package `packaging` is missing"
+    print "              No version checking will be performed"
+    CHECK_VERSION = False
+
+GRID_SIZE = 32
+DEBUG = True if "DEBUG" in os.environ.keys() else False
+
 class VersionError(Exception):
     """Custom error for version check failure"""
     pass
 
-def version_checker(version):
-    """Check input version vs current using semantic versioning"""
-    if version == "1.1B1":
-        version = "1.0.1-beta"
-    current_ver = semver.parse_version_info(VERSION)
-    input_ver = semver.parse_version_info(version)
-    if current_ver < input_ver:
+def compatibility(ver):
+    if ver == "1.1B1":
+        return "1.0.1-beta"
+
+def version_checker(ver):
+    if not CHECK_VERSION:
+        return True
+    ver = compatibility(ver)
+    ver = version.parse(ver)
+    cver = version.parse(VERSION)
+    if ver == cver:
+        return True
+    major, minor, patch = ver.base_version.split('.')
+    cmajor, cminor, cpatch = cver.base_version.split('.')
+    if major > cmajor:
         raise VersionError(
-            "Trying to read object written with future version. "
-            "Please upgrade your flametransfer software.")
-    if current_ver.major > input_ver.major:
+                "Trying to read object written with future major version. "
+                "Please upgrade your software.")
+    if major < cmajor:
+            print " WARNING : object was written with old discontinued version."
+            print "           Compatibility is not guaranteed."
+            return False
+    elif minor < cminor:
         raise VersionError(
-            "Flametransfer {0}.X.X cannot read old data from {1}"
-            .format(current_ver.major, version))
+                "Trying to read object written with future version. "
+                "Please upgrade your software.")
+    elif patch < cpatch:
+            print " WARNING : object was written with later (patched) release."
+            print "           Your are missing some bugfixes. Update soon."
+            return False
     return True
