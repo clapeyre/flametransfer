@@ -25,6 +25,9 @@ GRID_SIZE = int(environ_default("GRID_SIZE", 32))
 DEBUG = environ_default("DEBUG", False)
 HIP_START_TIME = float(environ_default("HIP_START_TIME", 1.0))
 
+if DEBUG:
+    print " !! DEBUG MODE ACTIVATED !!"
+
 try:
     from packaging import version
     CHECK_VERSION = True
@@ -32,9 +35,6 @@ except ImportError:
     print " !!WARNING!!: package `packaging` is missing"
     print "              No version checking will be performed"
     CHECK_VERSION = False
-
-GRID_SIZE = 32
-DEBUG = True if "DEBUG" in os.environ.keys() else False
 
 class VersionError(Exception):
     """Custom error for version check failure"""
