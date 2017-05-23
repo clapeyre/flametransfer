@@ -300,11 +300,17 @@ class ActiveFlame(object):
             self.metas.transform("scale", *args)
             shape.scale(*args)
         elif trans == "r":
-            self.metas.transform("rotate", *args)
             # Special case: box must be rotated, then interpolated back on a
             # cartesian grid aligned with x,y[,z]
             self._rotate(*args)
+            # transform metas, and overwrite metas for min/max points
+            self.metas.transform("rotate", *args)
+            self.metas.pt_min = Point(self.meshpoints.min(0))
+            self.metas.pt_max = Point(self.meshpoints.max(0))
+            # tranform shape to recover correct json
             shape.rotate(*args)
+            shape.vects.pt_min = Point(self.meshpoints.min(0))
+            shape.vects.pt_max = Point(self.meshpoints.max(0))
         else:
             raise ValueError("Unknown transformation, should be in [t, s, r]")
         self.make_meshpoints()
@@ -314,6 +320,21 @@ class ActiveFlame(object):
         """Convert this flame type to ScatterShape"""
         klass = ScatterShape3D if self.metas.ndim == 3 else ScatterShape2D
         self._shape_metas(klass(self.metas.pt_min, self.metas.pt_max))
+
+    def set_inside_pts(self):
+        """Set points inside flame according to flame file"""
+        with File(self.flame_file, 'r') as flame :
+            self.inside_points = flame["/Average/flames"].value
+
+    def read_mesh(self):
+        """read coordinates of the current mesh"""
+        Mshcor = np.zeros((self.metas.grid_size**self.metas.ndim, self.metas.ndim))
+        with File(self.mesh_file, 'r') as mesh:
+            Mshcor[:,0]  = mesh["/Coordinates/x"].value
+            Mshcor[:,1]  = mesh["/Coordinates/y"].value
+            if (self.metas.ndim == 3):
+                Mshcor[:,2]  = mesh["/Coordinates/z"].value
+        return Mshcor
 
     def _rotate(self, axis, angle, degrees=True):
         """Write and rotate flame in hip, then recreate x,y[,z] aligned mesh"""
@@ -328,25 +349,33 @@ class ActiveFlame(object):
           """.format(self, axis, angle, self.name))
         self.hip_wrapper.execute(rotate_script)
         self.harmonize_flame_name()
+        self.set_inside_pts()
+        Mshcor = self.read_mesh()
+        flamepoints = Mshcor[(self.inside_points>0.01)]
 
-        with File(self.flame_file, 'r') as flame:
-            self.inside_points = flame["/Average/flames"].value
-        self.make_meshpoints()
-        flamepoints = self.meshpoints[self.inside_points > 0.01]
         self.metas.pt_min = Point(flamepoints.min(0))
         self.metas.pt_max = Point(flamepoints.max(0))
+        self.make_meshpoints()
 
         interp_script = ["re hd -a {0.mesh_file} -s {0.flame_file}"
                          .format(self)]
         interp_script += self._get_hip_script_generate().split("\n")
-        interp_script.insert(3, "in gr 1")
+        interp_script.insert(3, "se in-rim 0")
+        interp_script.insert(4, "in gr 1")
+#       WAITING FOR HIP INTERPOLATION BUG CORRECTION
+#       interp_script.insert(3, "se ch 0")
+#       interp_script.insert(4, "se in-recoType flag")
+#       interp_script.insert(5, "se in-rim 0")
+#       interp_script.insert(6, "se bc-ty * n")
+#       interp_script.insert(7, "in gr 1")
         self.hip_wrapper.execute('\n'.join(interp_script))
         self.harmonize_flame_name()
-        self.write_h5()
+        self.set_inside_pts()
+        self.write_h5() 
 
     def export_avsp(self, avsp_mesh, avsp_sol, number):
         """Export flame to AVSP solution"""
-        self.make_mesh()
+	self.make_mesh()
         name = "flame_{}.h5".format(number)
         self.write_h5(number=number, name=name)
         # with File("avsp.sol.h5", "r") as f: print f["Average/flames"].value
