@@ -226,8 +226,8 @@ class ActiveFlame(object):
     def _shape_metas(self, shape):
         """Set metas that define the shape"""
         self.metas.ndim = shape.ndim
-        self.metas.pt_min = copy.deepcopy(shape.vects["pt_min"])
-        self.metas.pt_max = copy.deepcopy(shape.vects["pt_max"])
+        self.metas.pt_min = copy.deepcopy(shape.vects.pt_min)
+        self.metas.pt_max = copy.deepcopy(shape.vects.pt_max)
         self.metas.volume = shape.volume
         self.metas.shape_params = shape2json(shape)
 
@@ -439,4 +439,3 @@ class ActiveFlame(object):
         grp = flame["/Flames/{:03}".format(number)]
         version_checker(grp.attrs['version'])
         self.metas.load(grp.attrs)
-
