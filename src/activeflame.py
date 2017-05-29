@@ -134,8 +134,8 @@ class ActiveFlame(object):
                     return name
             selected_field = sol.visit(find_field)
             assert selected_field is not None, (
-                    "no field containing {0} found in {1}"
-                    .format(field, avbp_sol))
+                "no field containing {0} found in {1}"
+                .format(field, avbp_sol))
             data = sol[sol.visit(find_field)].value
             flame_flag = data > np.float(thresh)
         self.metas.avbp_mesh = avbp_mesh
@@ -242,7 +242,7 @@ class ActiveFlame(object):
         Use bounding box to create box mesh containing flame geometry
         """
         assert self.metas.pt_min is not None, (
-               "Bounding box needed for mesh gen")
+            "Bounding box needed for mesh gen")
         self.make_meshpoints()
         shutil.copy(self.template, self.mesh_file)
         with File(self.mesh_file, "a") as mesh:
@@ -271,11 +271,10 @@ class ActiveFlame(object):
 
     def _get_hip_script_generate(self):
         """Write hip script for mesh generation"""
-        line_3d = (
-                "co 3d {0[2]} {1[2]} {2} z".format(self.metas.pt_min,
-                                                   self.metas.pt_max,
-                                                   self.metas.grid_size - 1)
-                if self.metas.ndim == 3 else "")
+        line_3d = ("co 3d {0[2]} {1[2]} {2} z".format(self.metas.pt_min,
+                                                      self.metas.pt_max,
+                                                      self.metas.grid_size - 1)
+                   if self.metas.ndim == 3 else "")
         hip_script = dedent("""\
           ge {0[0]} {0[1]} {1[0]} {1[1]} {2} {2}
           {3}
@@ -323,7 +322,7 @@ class ActiveFlame(object):
 
     def set_inside_pts(self):
         """Set points inside flame according to flame file"""
-        with File(self.flame_file, 'r') as flame :
+        with File(self.flame_file, 'r') as flame:
             self.inside_points = flame["/Average/flames"].value
 
     def read_meshpoints(self):
@@ -332,12 +331,13 @@ class ActiveFlame(object):
         This mesh might not match the FlameTransfer format (e.g. cartesian
         aligned) so self.meshpoints is not updated.
         """
-        meshpoints = np.zeros((self.metas.grid_size**self.metas.ndim, self.metas.ndim))
+        meshpoints = np.zeros((self.metas.grid_size**self.metas.ndim,
+                               self.metas.ndim))
         with File(self.mesh_file, 'r') as mesh:
-            meshpoints[:,0]  = mesh["/Coordinates/x"].value
-            meshpoints[:,1]  = mesh["/Coordinates/y"].value
-            if (self.metas.ndim == 3):
-                meshpoints[:,2]  = mesh["/Coordinates/z"].value
+            meshpoints[:, 0] = mesh["/Coordinates/x"].value
+            meshpoints[:, 1] = mesh["/Coordinates/y"].value
+            if self.metas.ndim == 3:
+                meshpoints[:, 2] = mesh["/Coordinates/z"].value
         return meshpoints
 
     def _rotate(self, axis, angle, degrees=True):
@@ -355,11 +355,11 @@ class ActiveFlame(object):
           """.format(self, axis, angle, self.name))
         self.hip_wrapper.execute(rotate_script)
         self.harmonize_flame_name()
-        self.set_inside_pts()
 
         # Extract all flame point coordinates to create new cartesian aligned
         # bounding box
         meshpoints = self.read_meshpoints()
+        self.set_inside_pts()
         flamepoints = meshpoints[self.inside_points > 0.01]
         self.metas.pt_min = Point(flamepoints.min(0))
         self.metas.pt_max = Point(flamepoints.max(0))
@@ -460,9 +460,9 @@ class ActiveFlame(object):
             self._read_metas(flame, number=number)
             self.read_inside_pts(flame, number=number)
         self.log.info("Loaded flame named " + self.name)
-        self.log.debug("Contents :\n" + "\n".join(
-                "{0}: {1}".format(k, v)
-                for k, v in self.metas.__dict__.items()))
+        self.log.debug("Contents :\n" + "\n"
+                       .join("{0}: {1}".format(k, v)
+                             for k, v in self.metas.__dict__.items()))
         self.make_meshpoints()
 
     def load_metas(self, path, number=1):

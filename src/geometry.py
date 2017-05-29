@@ -241,11 +241,11 @@ class Parallelogram(Shape2D):
         x = np.atleast_2d(x - self.vects.xref())
         den = np.linalg.det(self.mat)
         num_a = np.apply_along_axis(
-                lambda m: np.linalg.det(
-                    np.vstack([m, self.mat[:, 1]])), 1, x)
+            lambda m: np.linalg.det(
+                np.vstack([m, self.mat[:, 1]])), 1, x)
         num_b = np.apply_along_axis(
-                lambda m: np.linalg.det(
-                    np.vstack([self.mat[:, 0], m])), 1, x)
+            lambda m: np.linalg.det(
+                np.vstack([self.mat[:, 0], m])), 1, x)
         return num_a / den, num_b / den
 
     def is_inside(self, x):
@@ -350,7 +350,6 @@ class Disc(Shape2D):
         """
         Shape2D.__init__(self)
         try:
-            assert len(radius) == 1
             self.vects.radius = Vector(np.array([radius[0], 0]))
         except TypeError:
             self.vects.radius = Vector(np.array([radius, 0]))
@@ -383,7 +382,7 @@ class Disc(Shape2D):
 
     def is_inside(self, x):
         """Determine if x is inside the disc"""
-        return (self.distance(x) <= self.radius)
+        return self.distance(x) <= self.radius
 
 
 class Sphere(Shape3D):
@@ -391,9 +390,8 @@ class Sphere(Shape3D):
         Shape3D.__init__(self)
         self.vects.center = Point(center)
         try:
-            assert len(radius) == 1
             self.vects.radius = Vector(np.array([radius[0], 0, 0]))
-        except :
+        except TypeError:
             self.vects.radius = Vector(np.array([radius, 0, 0]))
         self.check()
         self.bounding_box()
@@ -422,7 +420,7 @@ class Sphere(Shape3D):
 
     def is_inside(self, x):
         """Determine if x is inside the sphere"""
-        return (self.distance(x) <= self.radius)
+        return self.distance(x) <= self.radius
 
 
 class Cylinder(Shape3D):

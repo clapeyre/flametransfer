@@ -5,7 +5,6 @@ FlameMetas class to handle all meta information pertaining to an active flame.
 Created January 2017 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 """
 from collections import OrderedDict
-import numpy as np
 
 import geometry
 from constants import VERSION, GRID_SIZE
@@ -53,8 +52,7 @@ class FlameMetas(object):
         elif name in self.vects.keys():
             if self.vects[name] is None:
                 return self.vects[name]
-            else:
-                return self.vects[name]()
+            return self.vects[name]()
         else:
             raise AttributeError(name)
 
@@ -110,5 +108,3 @@ class FlameMetas(object):
         for vec in self.vects.values():
             if vec is not None:
                 getattr(vec, method)(*args)
-        if method == "scale":
-            self.volume *= np.prod(*args)
