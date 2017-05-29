@@ -326,20 +326,26 @@ class ActiveFlame(object):
         with File(self.flame_file, 'r') as flame :
             self.inside_points = flame["/Average/flames"].value
 
-    def read_mesh(self):
-        """read coordinates of the current mesh"""
-        Mshcor = np.zeros((self.metas.grid_size**self.metas.ndim, self.metas.ndim))
+    def read_meshpoints(self):
+        """Read coordinates of the current mesh.
+
+        This mesh might not match the FlameTransfer format (e.g. cartesian
+        aligned) so self.meshpoints is not updated.
+        """
+        meshpoints = np.zeros((self.metas.grid_size**self.metas.ndim, self.metas.ndim))
         with File(self.mesh_file, 'r') as mesh:
-            Mshcor[:,0]  = mesh["/Coordinates/x"].value
-            Mshcor[:,1]  = mesh["/Coordinates/y"].value
+            meshpoints[:,0]  = mesh["/Coordinates/x"].value
+            meshpoints[:,1]  = mesh["/Coordinates/y"].value
             if (self.metas.ndim == 3):
-                Mshcor[:,2]  = mesh["/Coordinates/z"].value
-        return Mshcor
+                meshpoints[:,2]  = mesh["/Coordinates/z"].value
+        return meshpoints
 
     def _rotate(self, axis, angle, degrees=True):
         """Write and rotate flame in hip, then recreate x,y[,z] aligned mesh"""
         self.make_mesh()
         self.write_h5()
+
+        # Perform rotation of the mesh with hip
         if not degrees:
             angle *= 180./np.pi
         rotate_script = dedent("""\
@@ -350,32 +356,33 @@ class ActiveFlame(object):
         self.hip_wrapper.execute(rotate_script)
         self.harmonize_flame_name()
         self.set_inside_pts()
-        Mshcor = self.read_mesh()
-        flamepoints = Mshcor[(self.inside_points>0.01)]
 
+        # Extract all flame point coordinates to create new cartesian aligned
+        # bounding box
+        meshpoints = self.read_meshpoints()
+        flamepoints = meshpoints[self.inside_points > 0.01]
         self.metas.pt_min = Point(flamepoints.min(0))
         self.metas.pt_max = Point(flamepoints.max(0))
         self.make_meshpoints()
 
+        # Interpolate the rotated flame on the new cartesian aligned grid
         interp_script = ["re hd -a {0.mesh_file} -s {0.flame_file}"
                          .format(self)]
         interp_script += self._get_hip_script_generate().split("\n")
-        interp_script.insert(3, "se in-rim 0")
-        interp_script.insert(4, "in gr 1")
-#       WAITING FOR HIP INTERPOLATION BUG CORRECTION
-#       interp_script.insert(3, "se ch 0")
-#       interp_script.insert(4, "se in-recoType flag")
-#       interp_script.insert(5, "se in-rim 0")
-#       interp_script.insert(6, "se bc-ty * n")
-#       interp_script.insert(7, "in gr 1")
+        interp_script += ["se ch 0",
+                          "se in-rim 0",
+                          # WAITING FOR HIP INTERPOLATION BUG CORRECTION
+                          # "se bc-ty * n",
+                          # "se in-recoType flag",
+                          "in gr 1"]
         self.hip_wrapper.execute('\n'.join(interp_script))
         self.harmonize_flame_name()
         self.set_inside_pts()
-        self.write_h5() 
+        self.write_h5()
 
     def export_avsp(self, avsp_mesh, avsp_sol, number):
         """Export flame to AVSP solution"""
-	self.make_mesh()
+        self.make_mesh()
         name = "flame_{}.h5".format(number)
         self.write_h5(number=number, name=name)
         # with File("avsp.sol.h5", "r") as f: print f["Average/flames"].value

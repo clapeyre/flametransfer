@@ -90,8 +90,8 @@ class VectorContainer(object):
         self.__dict__[name] = value
 
     def __iter__(self):
-	for value in self.__dict__.values():
-	    yield value
+        for value in self.__dict__.values():
+            yield value
 
 class Shape(object):
     def __init__(self, ndim):
@@ -331,7 +331,7 @@ class Parallelepiped(Shape3D):
         num_b = np.apply_along_axis(
             lambda m: np.linalg.det(
                 np.vstack([self.mat[:, 0], m, self.mat[:, 2]])), 1, x)
-	num_c = np.apply_along_axis(
+        num_c = np.apply_along_axis(
             lambda m: np.linalg.det(
                 np.vstack([self.mat[:, 0], self.mat[:, 1], m])), 1, x)
         return num_a / den, num_b / den, num_c / den
@@ -344,34 +344,37 @@ class Parallelepiped(Shape3D):
 
 class Disc(Shape2D):
     def __init__(self, center, radius):
+        """Read radius from input as a float, convert to array to comply with
+        defined transformations (otherwise *scaling* would fail to affect
+        radius)
+        """
         Shape2D.__init__(self)
-	# radius is read from input as a float and must be converted to array to comply with defined transformations
         try:
-            assert len(radius)==1
-            self.vects.radius = Vector(np.array([radius[0], 0]).reshape(-1,1))
-        except :
-            self.vects.radius = Vector(radius)        
-	self.vects.center = Point(center)
+            assert len(radius) == 1
+            self.vects.radius = Vector(np.array([radius[0], 0]))
+        except TypeError:
+            self.vects.radius = Vector(np.array([radius, 0]))
+        self.vects.center = Point(center)
         self.check()
         self.bounding_box()
 
     @property
     def radius(self):
-	return self.vects.radius.length
+        return self.vects.radius.length
 
     def bounding_box(self):
         """Set bounding box for shape"""
-	self.vects.pt_min = Point(self.vects.center() - self.radius)
+        self.vects.pt_min = Point(self.vects.center() - self.radius)
         self.vects.pt_max = Point(self.vects.center() + self.radius)
 
     @property
     def args(self):
-        return [self.vects.center(), self.vects.radius()]
+        return [self.vects.center(), self.radius]
 
     @property
     def area(self):
         """Get disc area"""
-	return np.pi * (self.radius)**2
+        return np.pi * self.radius**2
     volume = area
 
     def distance(self, x):
@@ -380,37 +383,38 @@ class Disc(Shape2D):
 
     def is_inside(self, x):
         """Determine if x is inside the disc"""
-	return(self.distance(x) <= self.radius)
+        return (self.distance(x) <= self.radius)
+
 
 class Sphere(Shape3D):
     def __init__(self, center, radius):
         Shape3D.__init__(self)
         self.vects.center = Point(center)
-	try:
-	    assert len(radius)==1
-            self.vects.radius = Vector(np.array([radius[0], 0, 0]).reshape(-1,1))
-	except :
-	    self.vects.radius = Vector(radius)
+        try:
+            assert len(radius) == 1
+            self.vects.radius = Vector(np.array([radius[0], 0, 0]))
+        except :
+            self.vects.radius = Vector(np.array([radius, 0, 0]))
         self.check()
         self.bounding_box()
 
-    @property 
+    @property
     def radius(self):
-	return self.vects.radius.length
+        return self.vects.radius.length
 
     def bounding_box(self):
         """Set bounding box for shape"""
-	self.vects.pt_min = Point(self.vects.center() - self.radius)
+        self.vects.pt_min = Point(self.vects.center() - self.radius)
         self.vects.pt_max = Point(self.vects.center() + self.radius)
 
     @property
     def args(self):
-        return [self.vects.center(), self.vects.radius()]
+        return [self.vects.center(), self.radius]
 
     @property
     def volume(self):
         """Get sphere volume"""
-	return (4./3. * np.pi * self.radius**3)
+        return 4./3. * np.pi * self.radius**3
 
     def distance(self, x):
         """Find distance to sphere center"""
@@ -418,13 +422,14 @@ class Sphere(Shape3D):
 
     def is_inside(self, x):
         """Determine if x is inside the sphere"""
-	return(self.distance(x) <= self.radius)
+        return (self.distance(x) <= self.radius)
+
 
 class Cylinder(Shape3D):
     def __init__(self, center, radius, ax_vec):
         Shape3D.__init__(self)
         self.vects.xref = Point(center)
-        self.vects.axis = Vector(ax_vec)
+        self.vects.ax_vec = Vector(ax_vec)
         self.radius = np.array(radius)
         self.check()
         self.bounding_box()
