@@ -277,10 +277,9 @@ class ActiveFlame(object):
                    if self.metas.ndim == 3 else "")
         hip_script = dedent("""\
           ge {0[0]} {0[1]} {1[0]} {1[1]} {2} {2}
-          {3}
-          wr hd ./{4}
+          {3} 
           """).format(self.metas.pt_min, self.metas.pt_max,
-                      self.metas.grid_size, line_3d, self.name)
+                      self.metas.grid_size, line_3d)
         return hip_script
 
     def transform(self, trans, *args):
@@ -374,7 +373,8 @@ class ActiveFlame(object):
                           # WAITING FOR HIP INTERPOLATION BUG CORRECTION
                           # "se bc-ty * n",
                           # "se in-recoType flag",
-                          "in gr 1"]
+                          "in gr 1",
+                          "wr hd ./{0}".format(self.name)]         
         self.hip_wrapper.execute('\n'.join(interp_script))
         self.harmonize_flame_name()
         self.set_inside_pts()

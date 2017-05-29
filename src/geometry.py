@@ -428,9 +428,16 @@ class Cylinder(Shape3D):
         Shape3D.__init__(self)
         self.vects.xref = Point(center)
         self.vects.ax_vec = Vector(ax_vec)
-        self.radius = np.array(radius)
+        try:
+            self.vects.radius = Vector(np.array([radius[0], 0]))
+        except TypeError:
+            self.vects.radius = Vector(np.array([radius, 0]))
         self.check()
         self.bounding_box()
+
+    @property
+    def radius(self):
+        return self.vects.radius.length
 
     def bounding_box(self):
         """Set bounding box for shape"""
@@ -443,7 +450,7 @@ class Cylinder(Shape3D):
                         xref_axis - proj,
                         xref_axis + vec_axis + proj,
                         xref_axis + vec_axis - proj]
-            return min(four_pts)[0], max(four_pts)[0]
+            return min(four_pts), max(four_pts)
         xmin, xmax = min_max_cyl(0)
         ymin, ymax = min_max_cyl(1)
         zmin, zmax = min_max_cyl(2)
@@ -458,7 +465,7 @@ class Cylinder(Shape3D):
     def volume(self):
         """Get cylinder volume"""
         return (np.linalg.norm(self.vects.ax_vec()) * np.pi
-                * self.radius**2)[0]
+                * self.radius**2)
 
     def project(self, x):
         """Project vector x on basis formed by cylinder
