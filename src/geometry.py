@@ -429,9 +429,9 @@ class Cylinder(Shape3D):
         self.vects.xref = Point(center)
         self.vects.ax_vec = Vector(ax_vec)
         try:
-            self.vects.radius = Vector(np.array([radius[0], 0]))
+            self.vects.radius = Vector(np.array([radius[0], 0, 0]))
         except TypeError:
-            self.vects.radius = Vector(np.array([radius, 0]))
+            self.vects.radius = Vector(np.array([radius, 0, 0]))
         self.check()
         self.bounding_box()
 
