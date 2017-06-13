@@ -8,7 +8,7 @@ setup(
     # scripts=['flametransfer/flametransfer.py'],
     entry_points={
         'console_scripts': [
-            'flametransfer = flametransfer.flametransfer:main',
+            'flametransfer = flametransfer.cli:main',
             'visu = flametransfer.visu:main'
         ],
     },
