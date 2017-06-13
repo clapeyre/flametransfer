@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="FlameTransfer",
-    version="1.0.0-rc2",
+    version="1.0.0rc2",
     packages=find_packages(),
     # scripts=['flametransfer/flametransfer.py'],
     entry_points={
@@ -15,8 +15,11 @@ setup(
 
     install_requires=[
         'numpy>=1.10',
-        'h5py>=2.5'
+        'h5py>=2.5',
     ],
+    extras_require={
+        'OpenTEA':  ["OpenTEA>=2.1"],
+    },
 
     # metadata
     author="Corentin J. Lapeyre",
