@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-FlameTransfer main command line utility
+FlameTransfer main Command Line Interface (CLI)
 
 USAGE:
     There are 2 ways to interact with this script:
@@ -684,10 +684,12 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                     return i, fla
             raise AssertionError("no such flame declared")
 
+def main():
+    stdin = None if len(sys.argv) == 1 else open(sys.argv[-1])
+    interpreter = FlameTransferCmd(stdin=stdin)
+    if stdin is not None:
+        interpreter.use_rawinput = False
+    interpreter.cmdloop_with_keyboard_interrupt()
 
 if __name__ == '__main__':
-    STDIN = None if len(sys.argv) == 1 else open(sys.argv[-1])
-    INTERPRETER = FlameTransferCmd(stdin=STDIN)
-    if STDIN is not None:
-        INTERPRETER.use_rawinput = False
-    INTERPRETER.cmdloop_with_keyboard_interrupt()
+    main()

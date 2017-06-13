@@ -9,6 +9,7 @@ import subprocess
 
 from tempfile import TemporaryFile
 
+
 def visu(mesh, sol):
     """Call visu script of AVBP (now inside FlameTransfer/bin)"""
     with TemporaryFile() as output:
@@ -18,5 +19,5 @@ def visu(mesh, sol):
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         output, err = process.communicate()
-        #while process.wait(): time.sleep(0.01)
+        # while process.wait(): time.sleep(0.01)
         return output
