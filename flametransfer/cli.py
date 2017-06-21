@@ -171,6 +171,9 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     except KeyError:
         print "ERROR: Please define the HIP_EXEC environment variable"
         sys.exit()
+    except OSError:
+        print "ERROR: HIP_EXEC is set but there is no executable file there"
+        sys.exit()
     intro = dedent("""\
             Welcome to the FlameTransfer V. {} command line
             Type help or ? for a list of commands,
@@ -684,12 +687,29 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                     return i, fla
             raise AssertionError("no such flame declared")
 
+    tests = []
+    def do_test(self, s):
+        """Test FlameTransfer"""
+        self.flames.test()
+
+    def help_test(self):
+        print dedent(
+            """
+            Run generic tests for FlameTransfer
+            > test
+            Only run this on startup.
+            """)
+
+    def complete_test(self, text, line, begidx, endidx):
+        return [f for f in self.imports if f.startswith(text)]
+
 def main():
     stdin = None if len(sys.argv) == 1 else open(sys.argv[-1])
     interpreter = FlameTransferCmd(stdin=stdin)
     if stdin is not None:
         interpreter.use_rawinput = False
     interpreter.cmdloop_with_keyboard_interrupt()
+
 
 if __name__ == '__main__':
     main()
