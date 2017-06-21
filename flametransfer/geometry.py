@@ -485,13 +485,6 @@ class Cylinder(Shape3D):
     def is_inside(self, x):
         """Determine if x is inside the cylinder"""
         axis, radius = self.project(x)
-        with open("pos.dat", "w") as f:
-            f.write("# x y z axis radius\n")
-            out = np.zeros((axis.size, 5))
-            out[:, :3] = x
-            out[:, 3] = axis
-            out[:, 4] = radius
-            np.savetxt(f, out)
         return (axis >= 0.) & (axis <= 1.) & (radius <= 1.)
 
 
