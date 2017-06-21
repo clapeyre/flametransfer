@@ -19,6 +19,7 @@ setup(
     ],
     extras_require={
         'OpenTEA':  ["OpenTEA>=2.1"],
+        'VersionChecks': ["packaging"],
     },
 
     # metadata
