@@ -149,6 +149,9 @@ class FlameTransferProcess(LibProcess):
         with open(join(extor.execute_dir, 'script.ft'), 'w') as f:
             f.write(script)
             f.write('\nqu\n')
+        self.log.debug("Content of script.ft:")
+        for line in script.split('\n'):
+            self.log.debug(line)
         for f in put_files:
             self.copy_file(f, extor.execute_dir)
         try:
@@ -162,7 +165,7 @@ class FlameTransferProcess(LibProcess):
         extor.finish()
 
     def get_metas(self, paths=None):
-        """Parse output of 'list metas' """
+        """Parse output of 'list metas'"""
         paths = paths if paths else [self.libobj_file(name)
                                      for name in self.libobjs]
         self.log.debug("Fetching metas for " + " ".join(paths))

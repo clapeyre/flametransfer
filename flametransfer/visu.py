@@ -593,7 +593,7 @@ def toXDMF_bnd(xdmf, meshName , solutbound ):
     mesh.close()
 
 # ===============================================================================
-def main(args):
+def main():
     from optparse import OptionParser
     import sys
     import os
@@ -611,11 +611,11 @@ def main(args):
     soltype=False
     cutype=False
 
-    if len(args) == 1:
+    if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(-1)
     else:
-        (options, args) = parser.parse_args(args)
+        (options, args) = parser.parse_args(sys.argv)
 
     if options.mesh == None:
         print """No mesh is specified"""
@@ -749,8 +749,7 @@ print contains(x, "xyz") //False """
 
 # ==============================================================================
 if __name__== "__main__":
-    import sys
-    main(sys.argv)
+    main()
     print "\n Warning : \n"
     print "  If variable is not present in the following list, it is not scaled by rho!!"
     print "  Scaled Variables are: \n"

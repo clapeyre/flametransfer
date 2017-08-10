@@ -17,9 +17,10 @@ import numpy as np
 from h5py import File
 
 from activeflame import ActiveFlame
-from geometry import Point, NormalVector
+import geometry as geo
 from constants import DEBUG
 from tools import visu
+
 
 class FlameDB(UserList, object):
     """List-like object to contain all flames
@@ -40,24 +41,26 @@ class FlameDB(UserList, object):
         """Export all flames to target"""
         shutil.copy(sol, "avsp_tmp0.sol.h5")
         with File("avsp_tmp0.sol.h5", 'a') as f:
-            if not "Average" in f.keys():
+            if "Average" not in f.keys():
                 f.create_group("Average")
                 f["Average/flames"] = np.zeros(f["Parameters/nnode"].value)
-            elif not "flames" in f["Average"].keys():
+            elif "flames" not in f["Average"].keys():
                 f["Average/flames"] = np.zeros(f["Parameters/nnode"].value)
-        for i,flame in enumerate(self.data):
-            print " --- Exporting flame {0} with number {1}".format(flame.name, i+1)
+        for i, flame in enumerate(self.data):
+            print (" --- Exporting flame {0} with number {1}"
+                   .format(flame.name, i+1))
             flame.export_avsp(mesh, "avsp_tmp{}.sol.h5".format(i), i+1)
         shutil.copy("avsp_tmp{}.sol.h5".format(i+1), "avsp.sol.h5")
         visu(mesh, "avsp.sol.h5")
         with File("avsp.sol.h5", 'a') as avsp:
-            for i,flame in enumerate(self.data):
+            for i, flame in enumerate(self.data):
                 flame.write_group(avsp, number=i+1)
-        if not DEBUG: [os.remove(fil) for fil in glob("avsp_tmp*")]
+        if not DEBUG:
+            [os.remove(fil) for fil in glob("avsp_tmp*")]
 
     def _get_mesh_voln(self, mesh):
         """Get volume at nodes.
-        
+
         Read and write with modern hip to recompute if needed
         """
         fil = File(mesh, 'r')
@@ -96,12 +99,13 @@ class FlameDB(UserList, object):
             n_globals = [np.sum(integral[zone]) for zone in zones]
         for i in range(len(zones)):
             flame = ActiveFlame('tmp', self.hip_wrapper)
-            flame.metas.name = sol.replace(".sol.h5", '') + "_{:03}".format(i + 1)
+            flame.metas.name = (sol.replace(".sol.h5", '')
+                                + "_{:03}".format(i + 1))
             flame.define_flame_scatter(mesh, flame_flags[i])
             flame.set_n2_tau(1., n_globals[i], taus[i])
             pt_ref, vec_ref = refs[i]
-            flame.metas.pt_ref = Point(pt_ref)
-            flame.metas.vec_ref = NormalVector(vec_ref)
+            flame.metas.pt_ref = geo.Point(pt_ref)
+            flame.metas.vec_ref = geo.NormalVector(vec_ref)
             self.append(flame)
         self.current = self.data[-1]
 
@@ -114,3 +118,22 @@ class FlameDB(UserList, object):
                 self.append(flame)
         self.current = self.data[-1]
 
+    def test(self):
+        """Run simple test for FlameTransfer"""
+        assert not self, "please run `test` at startup"
+        msg = "tests failed. See flametransfer.log"
+        try:
+            cyl = ActiveFlame('test_flame', self.hip_wrapper)
+            cyl.define_flame_cylinder([0, 0, 0], 1, [1, 1, 0])
+            cyl.set_n2_tau([0, 100], [500, 1000], [0.001]*2)
+            cyl.metas.pt_ref = geo.Point([0, 0, 0])
+            cyl.metas.vec_ref = geo.NormalVector([1, 1, 0])
+            self.append(cyl)
+            self[-1].write_full()
+        except Exception as err:
+            self.log.error(err.message)
+            raise AssertionError(msg)
+        assert os.path.isfile("test_flame.flame.h5"), msg
+        assert os.path.isfile("test_flame.flame.xmf"), msg
+        assert os.path.isfile("test_flame.mesh.h5"), msg
+        print " --- All tests passed."

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-FlameTransfer main command line utility
+FlameTransfer main Command Line Interface (CLI)
 
 USAGE:
     There are 2 ways to interact with this script:
@@ -100,15 +100,11 @@ class SmartCmd(cmd.Cmd, object):
         cmd, arg, _ = self.parseline(line)
         func = [getattr(self, n) for n in self.get_names()
                 if n.startswith('do_' + cmd)]
-        if not func:
-            self.stdout.write('*** unknown syntax: %s\n' % line)
-            return
-        elif len(func) > 1:
-            print '*** {} is a shorcut to several commands'.format(cmd)
-            print '    Please give more charaters for disambiguation'
-            return
-        else:
-            func[0](arg)
+        assert func, '*** unknown syntax: %s\n' % line
+        assert len(func) == 1, (
+            '*** {} is a shorcut to several commands '.format(cmd)
+            + '    Please give more charaters for disambiguation')
+        func[0](arg)
 
     def do_help(self, arg):
         """Wrapper for cmd.Cmd.do_help to accept shortcuts"""
@@ -170,6 +166,9 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         hip_wrapper = HipWrapper(os.environ['HIP_EXEC'])
     except KeyError:
         print "ERROR: Please define the HIP_EXEC environment variable"
+        sys.exit()
+    except OSError:
+        print "ERROR: HIP_EXEC is set but there is no executable file there"
         sys.exit()
     intro = dedent("""\
             Welcome to the FlameTransfer V. {} command line
@@ -684,10 +683,29 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
                     return i, fla
             raise AssertionError("no such flame declared")
 
+    tests = []
+    def do_test(self, s):
+        """Test FlameTransfer"""
+        self.flames.test()
+
+    def help_test(self):
+        print dedent(
+            """
+            Run generic tests for FlameTransfer
+            > test
+            Only run this on startup.
+            """)
+
+    def complete_test(self, text, line, begidx, endidx):
+        return [f for f in self.imports if f.startswith(text)]
+
+def main():
+    stdin = None if len(sys.argv) == 1 else open(sys.argv[-1])
+    interpreter = FlameTransferCmd(stdin=stdin)
+    if stdin is not None:
+        interpreter.use_rawinput = False
+    interpreter.cmdloop_with_keyboard_interrupt()
+
 
 if __name__ == '__main__':
-    STDIN = None if len(sys.argv) == 1 else open(sys.argv[-1])
-    INTERPRETER = FlameTransferCmd(stdin=STDIN)
-    if STDIN is not None:
-        INTERPRETER.use_rawinput = False
-    INTERPRETER.cmdloop_with_keyboard_interrupt()
+    main()

@@ -53,102 +53,56 @@
     </docu>
 </model>
 
-<xor name="xor_ndim" title="" default="three_d">
-    <model name="three_d" title="3D configuration">
-        <model name="ptref" title="Active flame references">
-           <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed=""/>
-           <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed=""/>
-        </model>
-        <xor name="xor_flame_geo" title="Flame geometry" default="analytical3D_cylinder" groups="on">
-            <model name="analytical3D_cylinder" title="Cylinder">
-                <docu>
-                    Locate where the flame (i.e. specified N and Tau values) is
-                    imposed in the AVSP initial solution. The flame is assumed
-                    compact and located in a cartesian volume.
-                    [section='x, y, z' :] Coordinates of center of the first (e.g. bottom) cylinder disc
-                    [section='radius' :] Radius of the cylinder
-                    [section='u_x, u_y, u_z' :] Coordinates of the vector defining the cylinder axis (center of first disc to center of second)
-                    <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
-                </docu>
-                <param name="ana_flame_center" title="Cylinder bottom disc center [m]" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed="" />
-                <param name="ana_flame_radius" title="Radius [m]" type="double_gt0" default="0.0" />
-                <param name="ana_flame_vector" title="Cylinder axis vector [m]" type="list_double" default="u_x;0.0;u_y;0.0;u_z;0.0" fixed="" />
-                <!-- <param name="box_flame_list" title="Box flame parameters [m]" type="list_double" default="x;0.0;y;0.0;z;0.0;x_length;0.0;y_length;0.0;z_length;0.0" /> -->
-            </model>
-            <model name="analytical3D_sphere" title="Sphere">
-                <docu>
-                    Locate where the flame (i.e. specified N and Tau values) is
-                    imposed in the AVSP initial solution. The flame is assumed
-                    compact and located in a cartesian volume.
-                    [section='x, y, z' :] Coordinates of the center of the sphere
-                    [section='radius' :] Radius of the sphere
-                    <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
-                </docu>
-                <param name="ana_flame_center" title="Sphere center [m]" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed="" />
-                <param name="ana_flame_radius" title="Radius [m]" type="double_gt0" default="0.0" />
-            </model>
-            <model name="analytical3D_brick" title="Brick">
-                <docu>
-                    Locate where the flame (i.e. specified N and Tau values) is
-                    imposed in the AVSP initial solution. The flame is assumed
-                    compact and located in a cartesian volume.
-                    [section='ptmin_x, ptmin_y, ptmin_z' :] Coordinates of bottom point
-                    [section='ptmax_x, ptmax_y, ptmax_z' :] Coordinates of top point
-                    <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
-                </docu>
-                <param name="ana_flame_pt_min" title="Bottom point [m]" type="list_double" default="ptmin_x;0.0;ptmin_y;0.0;ptmin_z;0.0" fixed="" />
-                <param name="ana_flame_pt_max" title="Bottom point [m]" type="list_double" default="ptmax_x;0.0;ptmax_y;0.0;ptmax_z;0.0" fixed="" />
-            </model>
-            <model name="avbp_scalar_threshold_3D" title="Scalar and Threshold">
-                <param name="avbp_sol" title="AVBP solution for scalar" type="file" filter="h5" default="" />
-                <param name="avbp_mesh" title="AVBP mesh" type="file" filter="h5" default="" />
-                <param name="scal" title="Scalar for threshold" type="string" default="" />
-                <param name="thresh" title="Threshold value" type="double" default="1.0" />
-            </model>
-        </xor>
+<model name="three_d" title="3D configuration">
+    <model name="ptref" title="Active flame references">
+       <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed=""/>
+       <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed=""/>
     </model>
-    <model name="two_d" title="2D Configuration">
-        <model name="ptref" title="Active flame references">
-           <param name="ptref_list" title="Ref. point [m]" type="list_double" default="x;0.0;y;0.0" fixed=""/>
-           <param name="vecref_list" title="Ref. vector" type="list_double" default="x;0.0;y;0.0" fixed=""/>
+    <xor name="xor_flame_geo" title="Flame geometry" default="analytical3D_cylinder" groups="on">
+        <model name="analytical3D_cylinder" title="Cylinder">
             <docu>
-                Reference vector is stored as unit vector. If you reload a (1, 1, 0) vector, it's
-                values will be changed to (1/sqrt(2), 1/sqrt(2), 0), but it's still pointing in the
-                same direction.
+                Locate where the flame (i.e. specified N and Tau values) is
+                imposed in the AVSP initial solution. The flame is assumed
+                compact and located in a cartesian volume.
+                [section='x, y, z' :] Coordinates of center of the first (e.g. bottom) cylinder disc
+                [section='radius' :] Radius of the cylinder
+                [section='u_x, u_y, u_z' :] Coordinates of the vector defining the cylinder axis (center of first disc to center of second)
+                <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
             </docu>
+            <param name="ana_flame_center" title="Cylinder bottom disc center [m]" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed="" />
+            <param name="ana_flame_radius" title="Radius [m]" type="double_gt0" default="0.0" />
+            <param name="ana_flame_vector" title="Cylinder axis vector [m]" type="list_double" default="u_x;0.0;u_y;0.0;u_z;0.0" fixed="" />
+            <!-- <param name="box_flame_list" title="Box flame parameters [m]" type="list_double" default="x;0.0;y;0.0;z;0.0;x_length;0.0;y_length;0.0;z_length;0.0" /> -->
         </model>
-        <xor name="xor_flame_geo" title="Flame geometry" default="analytical2D_rectangle" groups="on">
-            <model name="analytical2D_rectangle" title="Rectangle">
-                <docu>
-                    Locate where the flame (i.e. specified N and Tau values) is
-                    imposed in the AVSP initial solution. The flame is assumed
-                    compact and located in a cartesian volume.
-                    [section='ptmin_x, ptmin_y' :] Coordinates of bottom point
-                    [section='ptmax_x, ptmax_y' :] Coordinates of top point
-                    <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
-                </docu>
-                <param name="ana_flame_pt_min" title="Bottom point [m]" type="list_double" default="ptmin_x;0.0;ptmin_y;0.0" fixed="" />
-                <param name="ana_flame_pt_max" title="Bottom point [m]" type="list_double" default="ptmax_x;0.0;ptmax_y;0.0" fixed="" />
-            </model>
-            <model name="analytical2D_disc" title="Disc">
-                <docu>
-                    Locate where the flame (i.e. specified N and Tau values) is
-                    imposed in the AVSP initial solution. The flame is assumed
-                    compact and located in a cartesian volume.
-                    [section='x, y' :] Coordinates of the center of the disc
-                    [section='radius' :] Radius of the disc
-                    <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
-                </docu>
-                <param name="ana_flame_center" title="Sphere center [m]" type="list_double" default="x;0.0;y;0.0" fixed="" />
-                <param name="ana_flame_radius" title="Radius [m]" type="double_gt0" default="0.0" />
-            </model>
-            <model name="avbp_scalar_threshold_2D" title="Scalar and Threshold">
-                <param name="avbp_sol" title="AVBP solution for scalar" type="string" default="" />
-                <param name="avbp_mesh" title="AVBP mesh" type="string" default="" />
-                <param name="scal" title="Scalar for threshold" type="string" default="" />
-                <param name="thresh" title="Threshold value" type="double" default="1.0" />
-            </model>
-        </xor>
-    </model>
-</xor>
-
+        <model name="analytical3D_sphere" title="Sphere">
+            <docu>
+                Locate where the flame (i.e. specified N and Tau values) is
+                imposed in the AVSP initial solution. The flame is assumed
+                compact and located in a cartesian volume.
+                [section='x, y, z' :] Coordinates of the center of the sphere
+                [section='radius' :] Radius of the sphere
+                <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
+            </docu>
+            <param name="ana_flame_center" title="Sphere center [m]" type="list_double" default="x;0.0;y;0.0;z;0.0" fixed="" />
+            <param name="ana_flame_radius" title="Radius [m]" type="double_gt0" default="0.0" />
+        </model>
+        <model name="analytical3D_brick" title="Brick">
+            <docu>
+                Locate where the flame (i.e. specified N and Tau values) is
+                imposed in the AVSP initial solution. The flame is assumed
+                compact and located in a cartesian volume.
+                [section='ptmin_x, ptmin_y, ptmin_z' :] Coordinates of bottom point
+                [section='ptmax_x, ptmax_y, ptmax_z' :] Coordinates of top point
+                <!-- [image=active_flame_location.gif; caption=How to specify flame location] -->
+            </docu>
+            <param name="ana_flame_pt_min" title="Bottom point [m]" type="list_double" default="ptmin_x;0.0;ptmin_y;0.0;ptmin_z;0.0" fixed="" />
+            <param name="ana_flame_pt_max" title="Bottom point [m]" type="list_double" default="ptmax_x;0.0;ptmax_y;0.0;ptmax_z;0.0" fixed="" />
+        </model>
+        <model name="avbp_scalar_threshold_3D" title="Scalar and Threshold">
+            <param name="avbp_sol" title="AVBP solution for scalar" type="file" filter="h5" default="" />
+            <param name="avbp_mesh" title="AVBP mesh" type="file" filter="h5" default="" />
+            <param name="scal" title="Scalar for threshold" type="string" default="" />
+            <param name="thresh" title="Threshold value" type="double" default="1.0" />
+        </model>
+    </xor>
+</model>

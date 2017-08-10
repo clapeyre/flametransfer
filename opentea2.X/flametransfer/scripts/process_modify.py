@@ -141,47 +141,31 @@ def update_flame_params(pro):
         dst.addChild("xor_n_and_tau", "from_file", "n_tau")
         dst.addChild("n_tau_data_path", n_tau_file, "xor_n_and_tau")
 
-    # Rebuild xor_ndim
-    dst.removeNode("xor_ndim")
-    ndim = "three_d" if "3D" in gen_meth else "two_d"
-    dst.addChild("xor_ndim", ndim, "modify")
-    dst.addChild(ndim, "", "xor_ndim")
-    dst.addChild("ptref", "", ndim)
-    dst.addChild("ptref_list", to_ds_list('xyz', metas["pt_ref"]), "ptref")
-    dst.addChild("vecref_list", to_ds_list('xyz', metas["vec_ref"]), "ptref")
-    dst.addChild("xor_flame_geo", gen_meth, ndim)
-    dst.addChild(gen_meth, "", "xor_flame_geo")
+    # Rebuild geometry
+    dst.removeNode("three_d")
+    dst.addChild(gen_meth, "", "modify")
     sh_args = json.loads(metas["shape_params"])[1]
-    if gen_meth == "analytical2D_disc":
-        dst.addChild("ana_flame_center", to_ds_list('xy', sh_args[0]), gen_meth)
-        dst.addChild("ana_flame_radius", str(sh_args[1]), gen_meth)
-    elif gen_meth == "analytical2D_rectangle":
+    print sh_args
+    if gen_meth == "analytical3D_brick":
         dst.addChild("ana_flame_pt_min",
-                    to_ds_list('ptmin_x ptmin_y'.split(), sh_args[0]),
-                    gen_meth)
+                     to_ds_list('ptmin_x ptmin_y ptmin_z'.split(), sh_args[0]),
+                     gen_meth)
         dst.addChild("ana_flame_pt_max",
-                    to_ds_list('ptmax_x ptmax_y'.split(), sh_args[1]),
-                    gen_meth)
-    elif gen_meth == "analytical3D_brick":
-        dst.addChild("ana_flame_pt_min",
-                    to_ds_list('ptmin_x ptmin_y ptmin_z'.split(), sh_args[0]),
-                    gen_meth)
-        dst.addChild("ana_flame_pt_max",
-                    to_ds_list('ptmax_x ptmax_y ptmax_z'.split(), sh_args[1]),
-                    gen_meth)
+                     to_ds_list('ptmax_x ptmax_y ptmax_z'.split(), sh_args[1]),
+                     gen_meth)
     elif gen_meth == "analytical3D_sphere":
         dst.addChild("ana_flame_center",
-                    to_ds_list('xyz', sh_args[0]),
-                    gen_meth)
+                     to_ds_list('xyz', sh_args[0]),
+                     gen_meth)
         dst.addChild("ana_flame_radius", str(sh_args[1][0]), gen_meth)
     elif gen_meth == "analytical3D_cylinder":
         dst.addChild("ana_flame_center",
-                    to_ds_list('xyz', sh_args[0]),
-                    gen_meth)
-        dst.addChild("ana_flame_radius", str(sh_args[1][0]), gen_meth)
+                     to_ds_list('xyz', sh_args[0]),
+                     gen_meth)
+        dst.addChild("ana_flame_radius", str(sh_args[1]), gen_meth)
         dst.addChild("ana_flame_vector",
-                    to_ds_list('u_x u_y u_z'.split(), sh_args[2]),
-                    gen_meth)
+                     to_ds_list('u_x u_y u_z'.split(), sh_args[2]),
+                     gen_meth)
     elif gen_meth == "avbp_scalar_threshold_3D":
         dst.addChild("avbp_sol", metas["avbp_sol"], gen_meth)
         dst.addChild("avbp_mesh", metas["avbp_mesh"], gen_meth)

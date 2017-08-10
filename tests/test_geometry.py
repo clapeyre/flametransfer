@@ -1,5 +1,5 @@
 import numpy as np
-import geometry as geo
+from .context import geometry as geo
 
 
 class TestVector3D:
