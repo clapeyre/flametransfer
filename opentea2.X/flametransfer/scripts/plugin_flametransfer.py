@@ -15,7 +15,7 @@ class PluginFlametransfer(object):
         self.pythonexec = pythonexec
         self.exec_directory = exec_directory
         self.log = logging.getLogger(__name__)
-        
+
     def switch_flametransfer_tools(self, action):
         """Switch according to action"""
         if action == "-hip-":
@@ -23,9 +23,9 @@ class PluginFlametransfer(object):
 
         elif action in ["-get_metas-", "-create_flame-", "-replicate-", "-rename-"]:
             command_exe = self.flametransferexec + " ./script.ft"
-        
+
         else:
             self.log.error("Unknown action " + action)
             return None
 
-        return command_exe 
+        return command_exe
