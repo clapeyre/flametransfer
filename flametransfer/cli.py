@@ -100,15 +100,11 @@ class SmartCmd(cmd.Cmd, object):
         cmd, arg, _ = self.parseline(line)
         func = [getattr(self, n) for n in self.get_names()
                 if n.startswith('do_' + cmd)]
-        if not func:
-            self.stdout.write('*** unknown syntax: %s\n' % line)
-            return
-        elif len(func) > 1:
-            print '*** {} is a shorcut to several commands'.format(cmd)
-            print '    Please give more charaters for disambiguation'
-            return
-        else:
-            func[0](arg)
+        assert func, '*** unknown syntax: %s\n' % line
+        assert len(func) == 1, (
+            '*** {} is a shorcut to several commands '.format(cmd)
+            + '    Please give more charaters for disambiguation')
+        func[0](arg)
 
     def do_help(self, arg):
         """Wrapper for cmd.Cmd.do_help to accept shortcuts"""
