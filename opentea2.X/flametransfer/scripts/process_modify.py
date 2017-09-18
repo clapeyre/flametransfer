@@ -13,7 +13,7 @@ from os.path import basename
 
 import numpy as np
 
-from XDR2 import XDRInterrupt
+from opentea import OTInterrupt
 from flametransferprocess import FlameTransferProcess
 
 
@@ -75,7 +75,7 @@ def process_modify(pro):
                   avbp_sol]
         put_files += [avbp_sol, avbp_mesh]
     else:
-        raise XDRInterrupt("Unknown value for xor_flame_geo: " + flame_geo)
+        raise OTInterrupt("Unknown value for xor_flame_geo: " + flame_geo)
 
     n_tau_type = dst.getValue("xor_n_and_tau", "modify")
     if n_tau_type == "single_values":

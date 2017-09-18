@@ -12,7 +12,7 @@ import numpy as np
 
 from os.path import join, isfile, isdir, basename
 
-from XDR2 import LibProcess, RUN_CURRENT
+from opentea import LibProcess, RUN_CURRENT
 
 __all__ = ['FlameTransferProcess']
 
