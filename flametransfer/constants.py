@@ -9,6 +9,7 @@ __all__ = ['GRID_SIZE',
           ]
 
 import os
+import sys
 import logging
 log = logging.getLogger(__name__)
 
@@ -20,10 +21,11 @@ def environ_default(key, default):
     else:
         return env
 
-VERSION = "1.0.0-rc"
+VERSION = "1.0.0-rc.3"
 GRID_SIZE = int(environ_default("GRID_SIZE", 32))
 DEBUG = environ_default("DEBUG", False)
 HIP_START_TIME = float(environ_default("HIP_START_TIME", 1.0))
+log.debug("Python executable is: " + sys.executable)
 
 if DEBUG:
     print " !! DEBUG MODE ACTIVATED !!"

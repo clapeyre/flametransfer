@@ -162,6 +162,7 @@ class SmartCmd(cmd.Cmd, object):
 class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
     """Command line interpreter for flame transfer"""
     log = logging.getLogger(__name__)
+    log.debug("Python executable is: " + sys.executable)
     try:
         hip_wrapper = HipWrapper(os.environ['HIP_EXEC'])
     except KeyError:

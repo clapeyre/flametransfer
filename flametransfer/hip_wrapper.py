@@ -61,13 +61,13 @@ class HipWrapper(object):
                     if time() - timestamp > HIP_START_TIME:
                         process.kill()
                         self.log.error("Hip version was detected as older than "
-                                       "17.03, hence unsupported.")
+                                       "17.07, hence unsupported.")
                         self.log.error("Note that if the HIP_START_TIME variable "
                                        "is too low, it can cause false negatives. ")
                         self.log.error("Increase it with `HIP_START_TIME=2.0 "
                                        "flametransfer`")
                         raise AssertionError(
-                                "Hip version must be 17.03 at least for "
+                                "Hip version must be 17.07 at least for "
                                 "FlameTransfer. Please upgrade")
             self.last_exec_time = time() - timestamp
             self.log.debug(">>> Hip execution time (s): {}"
