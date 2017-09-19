@@ -315,6 +315,7 @@ class FlameTransferCmd(ShellCmd, SmartCmd, cmd.Cmd, object):
         out = open(s.split()[-1], 'w') if (len(s.split()) > 1) else sys.stdout
         if out == sys.stdout:
             print
+        assert s, "list needs an argument (see help list)"
         arg = s[0].lower()
         if arg == "f":  # flames
             width = max([len(f.metas.name) for f in self.flames])
