@@ -111,8 +111,8 @@ def process_modify(pro):
     script += ["qu\n"]
 
     pro.execute_script("-create_flame-",
-                      "\n".join(script), put_files=put_files,
-                      get_files=[pro.libobj_file(label)])
+                       "\n".join(script), put_files=put_files,
+                       get_files=[pro.libobj_file(label)])
 
 
 def update_flame_params(pro):
@@ -130,9 +130,9 @@ def update_flame_params(pro):
         dst.addChild("xor_n_and_tau", "single_values", "n_tau")
         dst.addChild("single_values", "", "xor_n_and_tau")
         dst.addChild("values",
-                    to_ds_list("Frequency N tau".split(),
-                               [x for y in metas["n2_tau"] for x in y]),
-                    "single_values")
+                     to_ds_list("Frequency N tau".split(),
+                                [x for y in metas["n2_tau"] for x in y]),
+                     "single_values")
     else:
         n_tau_file = metas["name"] + ".n2_tau.dat"
         with open(n_tau_file, "w") as f:
@@ -143,7 +143,9 @@ def update_flame_params(pro):
 
     # Rebuild geometry
     dst.removeNode("three_d")
-    dst.addChild(gen_meth, "", "modify")
+    dst.addChild("three_d", "", "modify")
+    dst.addChild("xor_flame_geo", "", "three_d")
+    dst.addChild(gen_meth, "", "xor_flame_geo")
     sh_args = json.loads(metas["shape_params"])[1]
     print sh_args
     if gen_meth == "analytical3D_brick":
@@ -162,7 +164,7 @@ def update_flame_params(pro):
         dst.addChild("ana_flame_center",
                      to_ds_list('xyz', sh_args[0]),
                      gen_meth)
-        dst.addChild("ana_flame_radius", str(sh_args[1]), gen_meth)
+        dst.addChild("ana_flame_radius", str(sh_args[1][0]), gen_meth)
         dst.addChild("ana_flame_vector",
                      to_ds_list('u_x u_y u_z'.split(), sh_args[2]),
                      gen_meth)
