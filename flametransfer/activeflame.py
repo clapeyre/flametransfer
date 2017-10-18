@@ -17,11 +17,11 @@ import numpy as np
 
 from h5py import File
 
-from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc, ScatterShape2D,
-                      ScatterShape3D, Point, json2shape, shape2json)
-from flamemetas import FlameMetas
-from constants import version_checker, DEBUG
-from tools import visu
+from .geometry import (Rectangle, Sphere, Cylinder, Brick, Disc, ScatterShape2D,
+                       ScatterShape3D, Point, json2shape, shape2json)
+from .flamemetas import FlameMetas
+from .constants import version_checker, DEBUG
+from .tools import visu
 
 
 class ActiveFlame(object):
@@ -68,6 +68,7 @@ class ActiveFlame(object):
 
     @property
     def template(self):
+        """Name of template file"""
         return join(dirname(realpath(__file__)), "..", "template",
                     "template{}d.mesh.h5".format(self.metas.ndim))
 
@@ -86,36 +87,37 @@ class ActiveFlame(object):
         #         out.writelines(xmf)
 
     def __getstate__(self):
-        d = dict(self.__dict__)
-        del d['log']
-        return d
+        dic = dict(self.__dict__)
+        del dic['log']
+        return dic
 
-    def __setstate__(self, d):
-        self.__dict__.update(d)
+    def __setstate__(self, dic):
+        self.__dict__.update(dic)
         self.log = logging.getLogger(__name__)
 
-    def compute_n_crocco(self, n1, area, p_mean, gamma):
+    @staticmethod
+    def compute_n_crocco(n_1, area, p_mean, gamma):
         """Define gain (N2) using Crocco's analytical formulation"""
-        return gamma * p_mean * area / (gamma - 1.) * n1
+        return gamma * p_mean * area / (gamma - 1.) * n_1
 
-    def set_n1_tau(self, freq, n1, tau, area, p_mean, gamma):
+    def set_n1_tau(self, freq, n_1, tau, area, p_mean, gamma):
         """Set N and tau from Crocco model (N1)"""
         self.set_n2_tau(freq,
-                        self.compute_n_crocco(n1, area, p_mean, gamma),
+                        self.compute_n_crocco(n_1, area, p_mean, gamma),
                         tau)
 
-    def set_n2_tau(self, freq, n2, tau):
+    def set_n2_tau(self, freq, n_2, tau):
         """Set N and tau from global values (same as AVSP internal)"""
-        self.metas.n2_tau = np.array((freq, n2, tau), ndmin=2)
+        self.metas.n2_tau = np.array((freq, n_2, tau), ndmin=2)
         # Ugly!! There's probably a better way to keep orientation consistent
         if self.metas.n2_tau.shape[0] != 3:
             self.metas.n2_tau = self.metas.n2_tau.T
 
-    def set_n3_tau(self, freq, n3, tau, u_bar, q_bar):
+    def set_n3_tau(self, freq, n_3, tau, u_bar, q_bar):
         """Set N and tau from non dimensional values (N3)"""
         self.metas.u_bar = u_bar
         self.metas.q_bar = q_bar
-        self.set_n2_tau(freq, n3 * u_bar / q_bar, tau)
+        self.set_n2_tau(freq, n_3 * u_bar / q_bar, tau)
 
     def get_n3(self):
         """Get value of N3 using u_bar and q_bar"""
@@ -130,6 +132,7 @@ class ActiveFlame(object):
         self.log.debug("Generating scattershape from AVBP")
         with File(avbp_sol, 'r') as sol:
             def find_field(name):
+                """h5py method for finding fields"""
                 if field.lower() in name.lower():
                     return name
             selected_field = sol.visit(find_field)
@@ -147,18 +150,15 @@ class ActiveFlame(object):
     def define_flame_scatter(self, input_mesh, flame_flag):
         """Use flame_flag on input_mesh to define ScatterPoint flame"""
         with File(input_mesh, 'r') as mesh:
-            x = mesh["Coordinates/x"].value
-            y = mesh["Coordinates/y"].value
-            x_flame = x[flame_flag]
-            y_flame = y[flame_flag]
+            x_flame = mesh["Coordinates/x"].value[flame_flag]
+            y_flame = mesh["Coordinates/y"].value[flame_flag]
             pt_min = [x_flame.min(), y_flame.min()]
             pt_max = [x_flame.max(), y_flame.max()]
             klass = ScatterShape2D
             self.metas.generation_method = "avbp_scalar_threshold_2D"
             if 'z' in mesh["Coordinates"].keys():
                 self.metas.generation_method = "avbp_scalar_threshold_3D"
-                z = mesh["Coordinates/z"].value
-                z_flame = z[flame_flag]
+                z_flame = mesh["Coordinates/z"].value[flame_flag]
                 pt_min += [z_flame.min()]
                 pt_max += [z_flame.max()]
                 klass = ScatterShape3D
@@ -374,7 +374,7 @@ class ActiveFlame(object):
                           # "se bc-ty * n",
                           # "se in-recoType flag",
                           "in gr 1",
-                          "wr hd ./{0}".format(self.name)]         
+                          "wr hd ./{0}".format(self.name)]
         self.hip_wrapper.execute('\n'.join(interp_script))
         self.harmonize_flame_name()
         self.set_inside_pts()
@@ -391,7 +391,8 @@ class ActiveFlame(object):
         if not DEBUG:
             os.remove(name)
 
-    def _get_expavsp_hip_script(self, src_mesh, src_sol, avsp_mesh, avsp_sol,
+    @staticmethod
+    def _get_expavsp_hip_script(src_mesh, src_sol, avsp_mesh, avsp_sol,
                                 number):
         """Generate hip script for flame interpolation on AVSP mesh"""
         return dedent("""\

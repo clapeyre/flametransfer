@@ -12,7 +12,7 @@ from glob import glob
 from time import time, sleep
 from tempfile import TemporaryFile
 
-from constants import DEBUG, HIP_START_TIME
+from .constants import DEBUG, HIP_START_TIME
 
 class HipWrapper(object):
     """Handle hip executions"""
@@ -30,16 +30,17 @@ class HipWrapper(object):
         else:
             script += "\nqu\n"
             def next_script():
+                """Get next script, whether in debug mode or not"""
                 scripts = glob("script_*.hip")
                 if DEBUG:
                     return "script_{:03}.hip".format(len(scripts)+1)
-                else:
-                    [os.remove(s) for s in scripts]
-                    [os.remove(s) for s in glob("script_*.hip.log")]
-                    return "script.hip"
+                for fil in scripts + glob("script_*.hip.log"):
+                    os.remove(fil)
+                return "script.hip"
             arg = next_script()
             self.log.debug("Executing hip script:")
-            [self.log.debug(" > " + line) for line in script.split('\n')]
+            for line in script.split('\n'):
+                self.log.debug(" > " + line)
             with open(arg, 'w') as scr:
                 scr.write(script)
         self.last_hip_output = ""
@@ -67,11 +68,11 @@ class HipWrapper(object):
                         self.log.error("Increase it with `HIP_START_TIME=2.0 "
                                        "flametransfer`")
                         raise AssertionError(
-                                "Hip version must be 17.07 at least for "
-                                "FlameTransfer. Please upgrade")
+                            "Hip version must be 17.07 at least for "
+                            "FlameTransfer. Please upgrade")
             self.last_exec_time = time() - timestamp
-            self.log.debug(">>> Hip execution time (s): {}"
-                           .format(self.last_exec_time))
+            self.log.debug(">>> Hip execution time (s): %d",
+                           self.last_exec_time)
             self.last_hip_output += output.read()
             self.log.debug(">>> Hip execution log:")
             for line in self.last_hip_output.split('\n'):

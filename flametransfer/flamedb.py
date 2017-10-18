@@ -7,6 +7,7 @@ Created Jan 2017 by Corentin Lapeyre (lapeyre@cerfacs.fr)
 
 import os
 import shutil
+import logging
 
 from glob import glob
 from UserList import UserList
@@ -16,10 +17,10 @@ import numpy as np
 
 from h5py import File
 
-from activeflame import ActiveFlame
-import geometry as geo
-from constants import DEBUG
-from tools import visu
+import flametransfer.geometry as geo
+from .activeflame import ActiveFlame
+from .constants import DEBUG
+from .tools import visu
 
 
 class FlameDB(UserList, object):
@@ -30,22 +31,24 @@ class FlameDB(UserList, object):
     """
     def __init__(self, hip_wrapper):
         UserList.__init__(self)
+        self.log = logging.getLogger(__name__)
         self.hip_wrapper = hip_wrapper
         self.current = None
 
     @property
     def names(self):
+        """List of names of all the flames"""
         return [fla.name for fla in self.data]
 
     def export_avsp6x(self, mesh, sol):
         """Export all flames to target"""
         shutil.copy(sol, "avsp_tmp0.sol.h5")
-        with File("avsp_tmp0.sol.h5", 'a') as f:
-            if "Average" not in f.keys():
-                f.create_group("Average")
-                f["Average/flames"] = np.zeros(f["Parameters/nnode"].value)
-            elif "flames" not in f["Average"].keys():
-                f["Average/flames"] = np.zeros(f["Parameters/nnode"].value)
+        with File("avsp_tmp0.sol.h5", 'a') as fil:
+            if "Average" not in fil.keys():
+                fil.create_group("Average")
+                fil["Average/flames"] = np.zeros(fil["Parameters/nnode"].value)
+            elif "flames" not in fil["Average"].keys():
+                fil["Average/flames"] = np.zeros(fil["Parameters/nnode"].value)
         for i, flame in enumerate(self.data):
             print (" --- Exporting flame {0} with number {1}"
                    .format(flame.name, i+1))
@@ -56,7 +59,8 @@ class FlameDB(UserList, object):
             for i, flame in enumerate(self.data):
                 flame.write_group(avsp, number=i+1)
         if not DEBUG:
-            [os.remove(fil) for fil in glob("avsp_tmp*")]
+            for fil in glob("avsp_tmp*"):
+                os.remove(fil)
 
     def _get_mesh_voln(self, mesh):
         """Get volume at nodes.
@@ -84,7 +88,7 @@ class FlameDB(UserList, object):
             nnode = fil["Parameters/nnode"].value[0]
             zones = []
             refs = []
-            for name, group in fil["/Zones"].items():
+            for _, group in fil["/Zones"].items():
                 mask = np.zeros((nnode,), dtype=bool)
                 mask[group["znode->node"].value - 1] = True
                 zones.append(mask)
