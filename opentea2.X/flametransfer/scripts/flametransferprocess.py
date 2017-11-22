@@ -137,7 +137,7 @@ class FlameTransferProcess(LibProcess):
                        str(angl),
                        "set static transform string",
                        "rotate {0} by {1}".format(name, angl)]
-        script += ["wr fl"]
+        script += ["wr fl all"]
         self.execute_script(
                 '-replicate-', "\n".join(script),
                 put_files=[self.libobj_file(name)],
