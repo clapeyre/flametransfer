@@ -593,12 +593,9 @@ def toXDMF_bnd(xdmf, meshName , solutbound ):
     mesh.close()
 
 # ===============================================================================
-def main():
+def cli():
     from optparse import OptionParser
     import sys
-    import os
-    import glob
-    import os.path
 
     print "\n Tool to generate visualization files \n"
     parser = OptionParser()
@@ -608,30 +605,36 @@ def main():
     parser.add_option('-b', '--bnd' , dest = 'bnd' , help = 'Path to hdf5 solutbound file.', default = None)
     parser.add_option('-v', '--vars', dest = "vars", help = 'List of variables to export. For instance "rho H2O" ', default = None)
 
-    soltype=False
-    cutype=False
-
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(-1)
     else:
         (options, args) = parser.parse_args(sys.argv)
 
-    if options.mesh == None:
-        print """No mesh is specified"""
-        sys.exit(-1)
+    main(mesh=options.mesh, sol=options.sol, cut=options.cut, bnd=options.bnd,
+         vrs=options.vars)
 
-    if options.sol == None:
+def main(mesh, sol, cut, bnd, vrs):
+    import sys
+    import glob
+    import os.path
+
+    soltype=False
+    cutype=False
+
+    assert mesh, "Mesh must be specified"
+
+    if sol == None:
         soltype = False
     else:
         soltype = True
 
-    if options.cut == None:
+    if cut == None:
         cutype = False
     else:
         cutype = True
 
-    if options.bnd == None:
+    if bnd == None:
         bndtype = False
     else:
         bndtype = True
@@ -639,74 +642,49 @@ def main():
     # The varList, if present, has the following syntax
     # python xdmf.py -m mesh.mesh.h5 -s init.h5 -v "rho H2O rhoE"
     varList = None
-    if options.vars != None:    
-        options.vars = options.vars.replace('"','')
-        varList = options.vars.split() # Split by space
+    if vrs is not None:
+        vrs = vrs.replace('"', '')
+        varList = vrs.split() # Split by space
 
-    # If no meshName is specified, try to read the ../run.dat and use
-    # this mesh
-    meshName = None
-    if options.mesh == None:    
-      print "ERROR - cannot determine mesh file name, use --mesh or fill ../run.dat"
-      parser.print_help()
-      sys.exit(-1)
-    else:
-      meshName=options.mesh
-
-    print 100*"-"
-    print " "
-    print " -> GRID : "+ os.path.abspath(meshName)
-    print " "
-
-    if cutype == False and soltype == False and bndtype == False and options.mesh != None:
-      xdmfName = meshName.replace(".h5",".xmf")
+    if cutype == False and soltype == False and bndtype == False and mesh != None:
+      xdmfName = mesh.replace(".h5",".xmf")
       xdmf = open(xdmfName, "w")
       xdmf.write(_header)
-      toXDMF(xdmf = xdmf, meshName = meshName, solName = None, varList = None)
+      toXDMF(xdmf = xdmf, meshName=mesh, solName = None, varList = None)
       xdmf.write(_footer)
       xdmf.close()
-
-      print "    - Xdmf file generated : ",xdmfName
-      print " "
-
-      print 100*"-"
-      sys.exit(0)
 
     # Print argument -s to check wildcards are correctly taken into
     # account
     # Check if a wildcard is given in argument
     # if so, use glob to expand wildcard into file list
     if soltype :
-      if contains(options.sol,"*"):
-        if contains(options.sol,".h5"):
-          solutionList = glob.glob(options.sol)
-        else: 
-          print 'You are using the * Wildcard. Please add .h5 to avoid conflits ex: -s "Mysol*.h5"'
-          sys.exit(-1)
+      if contains(sol,"*"):
+        if contains(sol,".h5"):
+          solutionList = glob.glob(sol)
+        else:
+            raise AssertionError('When using * wildcard, Please add .h5 to '
+                                 'avoid conflits ex: -s "Mysol*.h5"')
       else:
         # Create a List by splitting multiple solution by space
-        solutionList = options.sol.split()
+        solutionList = sol.split()
 
     if cutype :
-      if contains(options.cut,"*"):
-        if contains(options.cut,".h5"):
-          solutionList = glob.glob(options.cut)
+      if contains(cut,"*"):
+        if contains(cut,".h5"):
+          solutionList = glob.glob(cut)
         else: 
-          print 'You are using the * Wildcard. Please add .h5 to avoid conflits ex: -s "Mysol*.h5"'
-          sys.exit(-1)
+            raise AssertionError('When using * wildcard, Please add .h5 to '
+                                 'avoid conflits ex: -s "Mysol*.h5"')
       else:
         # Create a List by splitting multiple solution by space
-        solutionList = options.cut.split()
+        solutionList = cut.split()
 
-    if bndtype : 
-      solutionList = options.bnd.split()
+    if bndtype:
+      solutionList = bnd.split()
 
     # Sort solution list
     solutionList = sorted(solutionList)
-    print " " 
-    print " -> Files to be processed : \n"
-    print "    ", solutionList
-    print " " 
 
     # Loop over solution list
     # Note : it seems that the grid information is necessary for each time step in xdmf :(
@@ -714,30 +692,23 @@ def main():
     # open it each time, as the xdmf data structure appears more clearly
     # this way
     for solName in solutionList:
-      if not(os.path.isfile(solName)):
-        print solName + " does not exist"
-        sys.exit(-1)
+        assert os.path.isfile(solName), solName + " does not exist"
 
-      xdmfName = solName.replace(".h5",".xmf")
-      xdmf = open(xdmfName, "w")
+        xdmfName = solName.replace(".h5",".xmf")
+        xdmf = open(xdmfName, "w")
 
-      xdmf.write(_header)
-      if soltype: 
-        toXDMF(xdmf = xdmf, meshName = meshName, solName = solName, varList = varList)
-      if cutype: 
-        toXDMFcut(xdmf = xdmf, meshName = meshName, solName = solName, varList = varList)
-      if bndtype: 
-        xdmf.write(_header_bnd)
-        toXDMF_bnd(xdmf = xdmf, meshName = meshName, solutbound = solName)
-        xdmf.write(_footer_bnd)
+        xdmf.write(_header)
+        if soltype: 
+          toXDMF(xdmf = xdmf, meshName=mesh, solName = solName, varList = varList)
+        if cutype: 
+          toXDMFcut(xdmf = xdmf, meshName=mesh, solName = solName, varList = varList)
+        if bndtype: 
+          xdmf.write(_header_bnd)
+          toXDMF_bnd(xdmf = xdmf, meshName=mesh, solutbound = solName)
+          xdmf.write(_footer_bnd)
 
-      xdmf.write(_footer)
-      xdmf.close()
-      print "    - Xdmf file generated : ",xdmfName
-      print " "
-
-    print 100*"-"
-
+        xdmf.write(_footer)
+        xdmf.close()
 
 def contains(theString, theQueryValue):
   """ check if theString is contained into theQueryValue
@@ -749,7 +720,7 @@ print contains(x, "xyz") //False """
 
 # ==============================================================================
 if __name__== "__main__":
-    main()
+    cli()
     print "\n Warning : \n"
     print "  If variable is not present in the following list, it is not scaled by rho!!"
     print "  Scaled Variables are: \n"

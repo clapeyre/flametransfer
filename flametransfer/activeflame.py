@@ -17,11 +17,11 @@ import numpy as np
 
 from h5py import File
 
-from .geometry import (Rectangle, Sphere, Cylinder, Brick, Disc, ScatterShape2D,
-                       ScatterShape3D, Point, json2shape, shape2json)
-from .flamemetas import FlameMetas
-from .constants import version_checker, DEBUG
-from .tools import visu
+from geometry import (Rectangle, Sphere, Cylinder, Brick, Disc, ScatterShape2D,
+                      ScatterShape3D, Point, json2shape, shape2json)
+from flamemetas import FlameMetas
+from constants import version_checker, DEBUG
+from tools import visu
 
 
 class ActiveFlame(object):
@@ -427,8 +427,6 @@ class ActiveFlame(object):
         self.make_mesh()
         self.write_h5()
         output = visu(self.mesh_file, self.flame_file)
-        for line in output.split('\n'):
-            self.log.debug("VISU: " + line)
 
     def write_group(self, hdf_obj, number=1):
         """Write full flame in /Flames/00X of hdf file"""
