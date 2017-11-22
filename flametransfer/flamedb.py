@@ -17,10 +17,10 @@ import numpy as np
 
 from h5py import File
 
-import flametransfer.geometry as geo
-from .activeflame import ActiveFlame
-from .constants import DEBUG
-from .tools import visu
+import geometry as geo
+from activeflame import ActiveFlame
+from constants import DEBUG
+from tools import visu
 
 
 class FlameDB(UserList, object):

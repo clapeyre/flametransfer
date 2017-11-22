@@ -12,7 +12,7 @@ from glob import glob
 from time import time, sleep
 from tempfile import TemporaryFile
 
-from .constants import DEBUG, HIP_START_TIME
+from constants import DEBUG, HIP_START_TIME
 
 class HipWrapper(object):
     """Handle hip executions"""
