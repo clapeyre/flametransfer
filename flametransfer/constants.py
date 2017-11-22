@@ -21,7 +21,7 @@ def environ_default(key, default):
     else:
         return env
 
-VERSION = "1.0.0-rc.3"
+VERSION = "1.0.0-rc.5"
 GRID_SIZE = int(environ_default("GRID_SIZE", 32))
 DEBUG = environ_default("DEBUG", False)
 HIP_START_TIME = float(environ_default("HIP_START_TIME", 1.0))
